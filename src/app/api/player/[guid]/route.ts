@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/session";
 
-const GAME_API_BASE =
-  process.env.GAME_API_BASE ?? "https://api.sf-alpha.com/v2";
+const UPSTREAM = process.env.GAME_API_BASE ?? "https://api.sf-alpha.com/v2";
+const upstreamHost = new URL(UPSTREAM).host;
 
 export async function GET(
   _req: Request,
@@ -19,8 +19,14 @@ export async function GET(
   }
 
   try {
-    const res = await fetch(`${GAME_API_BASE}/player/${guid}`, {
-      headers: { Authorization: `Bearer ${session.token}` },
+    const res = await fetch(`${UPSTREAM}/player/${guid}`, {
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+        host: upstreamHost,
+        origin: `https://${upstreamHost}`,
+        referer: `https://${upstreamHost}/`,
+      },
       cache: "no-store",
     });
     const body = await res.json().catch(() => null);
