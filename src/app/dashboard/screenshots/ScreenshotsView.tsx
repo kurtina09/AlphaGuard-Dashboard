@@ -19,16 +19,14 @@ type PageResponse = {
 };
 
 type PlayerInfo = {
-  guid: string;
-  codename: string;
-  rank_num: number;
-  rank_exp: number;
-  kills: number;
-  kill_death_ratio: number;
-  win_ratio: number;
-  matches_played: number;
-  missions_completed: number;
-  private_match_scores: boolean;
+  player_guid: string;
+  codename: string | null;
+  rank_num: number | null;
+  rank_exp: number | null;
+  username: string | null;
+  email: string | null;
+  region: string | null;
+  birthdate: string | null;
 };
 
 const PAGE_SIZE = 24;
@@ -253,21 +251,13 @@ export default function ScreenshotsView() {
               )}
 
               {playerInfo && (
-                <div>
-                  <div className="flex items-baseline gap-3 mb-3">
-                    <span className="text-base font-semibold">{playerInfo.codename}</span>
-                    <span className="text-xs text-[var(--text-dim)]">Rank {playerInfo.rank_num}</span>
-                    {playerInfo.private_match_scores && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--warn)]/20 text-[var(--warn)]">Private scores</span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                    <StatCell label="Kills" value={playerInfo.kills.toLocaleString()} />
-                    <StatCell label="K/D Ratio" value={playerInfo.kill_death_ratio.toFixed(2)} />
-                    <StatCell label="Win Rate" value={`${(playerInfo.win_ratio * 100).toFixed(1)}%`} />
-                    <StatCell label="Matches" value={playerInfo.matches_played.toLocaleString()} />
-                    <StatCell label="Missions" value={playerInfo.missions_completed.toLocaleString()} />
-                  </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <StatCell label="Codename" value={playerInfo.codename ?? "—"} />
+                  <StatCell label="Username" value={playerInfo.username ?? "—"} />
+                  <StatCell label="Email" value={playerInfo.email ?? "—"} />
+                  <StatCell label="Rank" value={playerInfo.rank_num != null ? String(playerInfo.rank_num) : "—"} />
+                  <StatCell label="Region" value={playerInfo.region ?? "—"} />
+                  <StatCell label="Birthdate" value={playerInfo.birthdate ?? "—"} />
                 </div>
               )}
             </div>
