@@ -3,6 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const IS_LOCAL =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1");
+
+const getApiUrl = () => {
+  if (IS_LOCAL) return "/api/v2";
+  return process.env.NEXT_PUBLIC_GAME_API_BASE ?? "https://api.sf-alpha.com/v2";
+};
+
 export default function LoginForm() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -18,7 +28,7 @@ export default function LoginForm() {
       // Call the SF Alpha API directly from the browser so Cloudflare
       // bot protection doesn't block the request.
       const gameRes = await fetch(
-        `${process.env.NEXT_PUBLIC_GAME_API_BASE}/auth/login`,
+        `${getApiUrl()}/auth/login`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
