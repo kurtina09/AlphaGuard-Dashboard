@@ -27,7 +27,10 @@ export async function login(
     let message = `Login failed (${res.status})`;
     try {
       const body = await res.json();
+      console.error("[game-api] login error body:", JSON.stringify(body));
       if (body?.diagnostics?.message) message = body.diagnostics.message;
+      else if (body?.message) message = body.message;
+      else if (typeof body === "string") message = body;
     } catch {}
     throw new Error(message);
   }

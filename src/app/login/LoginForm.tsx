@@ -15,16 +15,38 @@ export default function LoginForm() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(body.error || "Login failed.");
+      // Call the SF Alpha API directly from the browser so Cloudflare
+      // bot protection doesn't block the request.
+      const gameRes = await fetch(
+        `${process.env.NEXT_PUBLIC_GAME_API_BASE}/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password, keep_me_logged_in: false }),
+        },
+      );
+      const gameBody = await gameRes.json().catch(() => ({}));
+      if (!gameRes.ok) {
+        const msg =
+          gameBody?.diagnostics?.message ||
+          gameBody?.message ||
+          `Login failed (${gameRes.status})`;
+        setError(msg);
         return;
       }
+
+      // Hand the token to our server to create the httpOnly session cookie.
+      const sessionRes = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(gameBody),
+      });
+      const sessionBody = await sessionRes.json().catch(() => ({}));
+      if (!sessionRes.ok) {
+        setError(sessionBody.error || "Session creation failed.");
+        return;
+      }
+
       router.replace("/dashboard/detections");
       router.refresh();
     } catch {
