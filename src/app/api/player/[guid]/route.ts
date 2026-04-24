@@ -39,27 +39,20 @@ export async function GET(
 
   const token = session.token!;
 
-  // Fetch player stats and attempt user lookup in parallel.
-  // User lookup tries player_guid first; SF Alpha may map it to the linked account.
-  const [playerInfo, userInfo] = await Promise.all([
-    apiFetch(`/player/${guid}`, token),
-    apiFetch(`/users/${guid}`, token),
-  ]);
+  const playerInfo = await apiFetch(`/player/${guid}`, token);
 
-  if (!playerInfo && !userInfo) {
+  if (!playerInfo) {
     return NextResponse.json({ error: "Player not found." }, { status: 404 });
   }
 
   return NextResponse.json({
     player_guid: guid,
-    // From playerInfo
-    codename: playerInfo?.codename ?? userInfo?.user?.codename ?? null,
-    rank_num: playerInfo?.rank_num ?? userInfo?.user?.rank_num ?? null,
-    rank_exp: playerInfo?.rank_exp ?? userInfo?.user?.rank_exp ?? null,
-    // From userInfo (may be null if lookup failed)
-    username: userInfo?.user?.name ?? null,
-    email: userInfo?.user?.email ?? null,
-    region: userInfo?.user?.region ?? null,
-    birthdate: userInfo?.user?.birthdate ?? null,
+    codename: playerInfo.codename ?? null,
+    rank_num: playerInfo.rank_num ?? null,
+    rank_exp: playerInfo.rank_exp ?? null,
+    kills: playerInfo.kills ?? null,
+    kill_death_ratio: playerInfo.kill_death_ratio ?? null,
+    matches_played: playerInfo.matches_played ?? null,
+    win_ratio: playerInfo.win_ratio ?? null,
   });
 }
