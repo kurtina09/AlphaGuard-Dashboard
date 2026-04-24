@@ -12,12 +12,12 @@ export default async function DashboardLayout({
     redirect("/login");
   }
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       <Nav
         codename={session.codename || session.username || "admin"}
         roleName={session.roleName || ""}
       />
-      <main className="flex-1 p-8 overflow-x-hidden">{children}</main>
+      <main className="flex-1 p-8 overflow-y-auto overflow-x-hidden">{children}</main>
     </div>
   );
 }
