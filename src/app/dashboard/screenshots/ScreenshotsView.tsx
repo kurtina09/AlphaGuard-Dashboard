@@ -23,10 +23,10 @@ type PlayerInfo = {
   codename: string | null;
   rank_num: number | null;
   rank_exp: number | null;
-  username: string | null;
-  email: string | null;
-  region: string | null;
-  birthdate: string | null;
+  kills: number | null;
+  kill_death_ratio: number | null;
+  matches_played: number | null;
+  win_ratio: number | null;
 };
 
 const PAGE_SIZE = 24;
@@ -251,13 +251,13 @@ export default function ScreenshotsView() {
               )}
 
               {playerInfo && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <StatCell label="Codename" value={playerInfo.codename ?? "—"} />
-                  <StatCell label="Username" value={playerInfo.username ?? "—"} />
-                  <StatCell label="Email" value={playerInfo.email ?? "—"} />
                   <StatCell label="Rank" value={playerInfo.rank_num != null ? String(playerInfo.rank_num) : "—"} />
-                  <StatCell label="Region" value={playerInfo.region ?? "—"} />
-                  <StatCell label="Birthdate" value={playerInfo.birthdate ?? "—"} />
+                  <StatCell label="Kills" value={playerInfo.kills != null ? String(playerInfo.kills) : "—"} />
+                  <StatCell label="KDR" value={playerInfo.kill_death_ratio != null ? playerInfo.kill_death_ratio.toFixed(2) : "—"} />
+                  <StatCell label="Matches" value={playerInfo.matches_played != null ? String(playerInfo.matches_played) : "—"} />
+                  <StatCell label="Win Ratio" value={playerInfo.win_ratio != null ? playerInfo.win_ratio.toFixed(2) : "—"} />
                 </div>
               )}
             </div>
