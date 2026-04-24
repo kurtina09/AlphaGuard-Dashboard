@@ -59,6 +59,7 @@ export default function ScreenshotsView() {
   const [playerInfo, setPlayerInfo] = useState<PlayerInfo | null>(null);
   const [playerLoading, setPlayerLoading] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,12 +84,19 @@ export default function ScreenshotsView() {
     setLightbox(item);
     setPlayerInfo(null);
     setPlayerError(null);
+    setZoom(1);
   }
 
   function closeLightbox() {
     setLightbox(null);
     setPlayerInfo(null);
     setPlayerError(null);
+    setZoom(1);
+  }
+
+  function handleWheel(e: React.WheelEvent) {
+    e.preventDefault();
+    setZoom(z => Math.min(4, Math.max(1, z - e.deltaY * 0.001)));
   }
 
   async function loadPlayerInfo(playerGuid: string) {
@@ -216,19 +224,58 @@ export default function ScreenshotsView() {
                 <div className="font-mono text-xs text-[var(--text-dim)]">{lightbox.player_guid}</div>
                 <div className="text-[var(--text-dim)] text-xs mt-0.5">{fmtDate(lightbox.time)}</div>
               </div>
-              <button onClick={closeLightbox} className="px-3 py-1 text-[var(--text-dim)] hover:text-white text-sm">
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 border rounded-md overflow-hidden text-xs">
+                  <button
+                    onClick={() => setZoom(z => Math.max(1, +(z - 0.25).toFixed(2)))}
+                    disabled={zoom <= 1}
+                    className="px-2 py-1 text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)] disabled:opacity-30"
+                  >−</button>
+                  <span className="px-2 py-1 text-[var(--text-dim)] min-w-[44px] text-center">{Math.round(zoom * 100)}%</span>
+                  <button
+                    onClick={() => setZoom(z => Math.min(4, +(z + 0.25).toFixed(2)))}
+                    disabled={zoom >= 4}
+                    className="px-2 py-1 text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)] disabled:opacity-30"
+                  >+</button>
+                  <button
+                    onClick={() => setZoom(1)}
+                    disabled={zoom === 1}
+                    className="px-2 py-1 text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)] disabled:opacity-30 border-l"
+                  >Reset</button>
+                </div>
+                <button onClick={closeLightbox} className="px-3 py-1 text-[var(--text-dim)] hover:text-white text-sm">
+                  Close
+                </button>
+              </div>
             </div>
 
             {/* Screenshot */}
-            <div className="bg-black flex items-center justify-center overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/screenshots/${lightbox.unique_id}`}
-                alt={`screenshot ${lightbox.unique_id}`}
-                className="max-w-full max-h-[55vh] object-contain"
-              />
+            <div
+              className="bg-black overflow-auto"
+              style={{ maxHeight: '60vh', cursor: zoom > 1 ? 'move' : 'zoom-in' }}
+              onWheel={handleWheel}
+            >
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: zoom <= 1 ? '0' : '100%',
+                padding: zoom > 1 ? '1rem' : '0',
+              }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/screenshots/${lightbox.unique_id}`}
+                  alt={`screenshot ${lightbox.unique_id}`}
+                  onClick={() => setZoom(z => z >= 4 ? 1 : +(z + 0.5).toFixed(2))}
+                  style={{
+                    display: 'block',
+                    maxWidth: zoom <= 1 ? '100%' : 'none',
+                    maxHeight: zoom <= 1 ? '60vh' : 'none',
+                    width: zoom > 1 ? `${zoom * 100}%` : 'auto',
+                    transition: 'width 0.15s, max-width 0.15s',
+                  }}
+                />
+              </div>
             </div>
 
             {/* Player info section */}
