@@ -16,6 +16,7 @@ export default function Nav({
   const links = [
     { href: "/dashboard/detections", label: "Detections" },
     { href: "/dashboard/screenshots", label: "Screenshots" },
+    { href: "/dashboard/live-matches", label: "Live Matches" },
   ];
 
   async function logout() {
