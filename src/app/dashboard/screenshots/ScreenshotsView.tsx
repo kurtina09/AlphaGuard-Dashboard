@@ -29,7 +29,7 @@ type PlayerInfo = {
   win_ratio: number | null;
 };
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 100;
 
 function fmtDate(s: string) {
   if (!s) return "";
