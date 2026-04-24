@@ -3,15 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const IS_LOCAL =
-  typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1");
-
-const getApiUrl = () => {
-  if (IS_LOCAL) return "/api/v2";
-  return process.env.NEXT_PUBLIC_GAME_API_BASE ?? "https://api.sf-alpha.com/v2";
-};
+const getApiUrl = () => "/api/v2";
 
 export default function LoginForm() {
   const router = useRouter();
