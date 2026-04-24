@@ -252,30 +252,21 @@ export default function ScreenshotsView() {
             {/* Screenshot */}
             <div
               className="bg-black overflow-auto"
-              style={{ maxHeight: '60vh', cursor: zoom > 1 ? 'move' : 'zoom-in' }}
+              style={{ maxHeight: '60vh' }}
               onWheel={handleWheel}
             >
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: zoom <= 1 ? '0' : '100%',
-                padding: zoom > 1 ? '1rem' : '0',
-              }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/screenshots/${lightbox.unique_id}`}
-                  alt={`screenshot ${lightbox.unique_id}`}
-                  onClick={() => setZoom(z => z >= 4 ? 1 : +(z + 0.5).toFixed(2))}
-                  style={{
-                    display: 'block',
-                    maxWidth: zoom <= 1 ? '100%' : 'none',
-                    maxHeight: zoom <= 1 ? '60vh' : 'none',
-                    width: zoom > 1 ? `${zoom * 100}%` : 'auto',
-                    transition: 'width 0.15s, max-width 0.15s',
-                  }}
-                />
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/screenshots/${lightbox.unique_id}`}
+                alt={`screenshot ${lightbox.unique_id}`}
+                onClick={() => setZoom(z => z >= 4 ? 1 : +(z + 0.5).toFixed(2))}
+                style={{
+                  display: 'block',
+                  width: `${zoom * 100}%`,
+                  cursor: zoom < 4 ? 'zoom-in' : 'zoom-out',
+                  transition: 'width 0.15s ease',
+                }}
+              />
             </div>
 
             {/* Player info section */}
