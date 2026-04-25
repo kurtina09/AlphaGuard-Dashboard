@@ -1,19 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/session";
-import { getPool } from "@/lib/db";
-
-async function ensureTable() {
-  const pool = getPool();
-  await pool.execute(`
-    CREATE TABLE IF NOT EXISTS watchlist (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      player_guid VARCHAR(36) NOT NULL,
-      reason TEXT NOT NULL,
-      added_by VARCHAR(100),
-      added_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-}
+import { readWatchlist, writeWatchlist, type WatchlistEntry } from "@/lib/watchlist-store";
 
 export async function GET() {
   const session = await getSession();
@@ -22,14 +9,10 @@ export async function GET() {
   }
 
   try {
-    await ensureTable();
-    const pool = getPool();
-    const [rows] = await pool.execute(
-      "SELECT id, player_guid, reason, added_by, added_at FROM watchlist ORDER BY added_at DESC"
-    );
-    return NextResponse.json({ items: rows });
+    const items = await readWatchlist();
+    return NextResponse.json({ items });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Database error.";
+    const message = err instanceof Error ? err.message : "Failed to read watchlist.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -55,15 +38,18 @@ export async function POST(req: Request) {
   }
 
   try {
-    await ensureTable();
-    const pool = getPool();
-    await pool.execute(
-      "INSERT INTO watchlist (player_guid, reason, added_by) VALUES (?, ?, ?)",
-      [player_guid, reason.trim(), session.codename || session.username || "admin"]
-    );
+    const items = await readWatchlist();
+    const entry: WatchlistEntry = {
+      id: Date.now(),
+      player_guid,
+      reason: reason.trim(),
+      added_by: session.codename || session.username || "admin",
+      added_at: new Date().toISOString(),
+    };
+    await writeWatchlist([entry, ...items]);
     return NextResponse.json({ success: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Database error.";
+    const message = err instanceof Error ? err.message : "Failed to save watchlist.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
