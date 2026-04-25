@@ -141,6 +141,22 @@ export default function DetectionsView() {
         >
           Reset
         </button>
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="px-4 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40"
+        >
+          {loading ? "Loading…" : "Refresh"}
+        </button>
+        <button
+          type="button"
+          disabled={!data || data.last || loading}
+          onClick={() => setPage((p) => p + 1)}
+          className="px-4 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Next
+        </button>
       </form>
 
       <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
