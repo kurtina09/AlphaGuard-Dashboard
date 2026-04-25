@@ -17,7 +17,7 @@ export default function Nav({
     { href: "/dashboard/screenshots", label: "Screenshots" },
     { href: "/dashboard/ban", label: "Ban / Kick" },
     { href: "/dashboard/detections", label: "Detections" },
-    { href: "/dashboard/live-matches", label: "Live Matches" },
+    { href: "/dashboard/live-matches", label: "Search Matches" },
     { href: "/dashboard/watchlist", label: "Watch List" },
   ];
 

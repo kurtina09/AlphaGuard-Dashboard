@@ -1,295 +1,376 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
-type Match = {
-  guid: string;
-  host_guid: string;
-  map_guid: string;
-  game_mode: string;
-  player_count: number;
-  max_players: number;
-  score_limit: number;
-  time_limit: number;
-  status: string;
-  map_name: string;
-  map_image: string;
-};
-
-type MatchesResponse = {
-  matches: Match[];
-  total: number;
-};
-
-type MatchPlayer = {
-  codename: string;
-  player_guid: string;
-  rank_num: number;
-  kills: number;
-  deaths: number;
+/* ── Types ─────────────────────────────────────────────── */
+type MatchItem = {
   assists: number;
-  headshots: number;
+  blue_wins: number;
+  date_added: string;
+  deaths: number;
   experience: number;
+  headshots: number;
+  kills: number;
+  map: number;
+  match_result_guid: string;
+  match_time: string;
+  missions_completed: number;
+  mode: number;
+  red_wins: number;
+  round_loses: number;
+  round_wins: number;
+  sp: number;
   team: string;
+  winner_team: string;
   won: boolean;
 };
 
-type MatchDetail = {
-  all_players: MatchPlayer[];
-  red_team: MatchPlayer[];
-  blue_team: MatchPlayer[];
-  is_ffa: boolean;
-  map: string;
-  mode: string;
-  match_time: number;
-  winner_team: string | null;
+type MatchesResponse = {
+  first: boolean;
+  last: boolean;
+  page: number;
+  totalCount: number;
+  total_pages: number;
+  items: MatchItem[];
 };
 
-const REFRESH_INTERVAL = 30_000;
-
-function Badge({ children, color }: { children: React.ReactNode; color?: string }) {
-  return (
-    <span
-      className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-        color ?? "bg-[var(--panel-2)] text-[var(--text-dim)]"
-      }`}
-    >
-      {children}
-    </span>
-  );
+/* ── Helpers ────────────────────────────────────────────── */
+function formatDate(iso: string) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
 }
 
-function PlayerRow({ p }: { p: MatchPlayer }) {
-  const teamColor =
-    p.team === "red"
-      ? "text-red-400"
-      : p.team === "blue"
-      ? "text-blue-400"
-      : "text-[var(--text-dim)]";
-
-  return (
-    <tr className="border-b border-[var(--panel)] last:border-0">
-      <td className="py-1.5 px-3 font-medium text-sm">{p.codename}</td>
-      <td className={`py-1.5 px-3 text-xs ${teamColor}`}>{p.team || "—"}</td>
-      <td className="py-1.5 px-3 text-xs text-center">{p.rank_num}</td>
-      <td className="py-1.5 px-3 text-xs text-center">{p.kills}</td>
-      <td className="py-1.5 px-3 text-xs text-center">{p.deaths}</td>
-      <td className="py-1.5 px-3 text-xs text-center">{p.assists}</td>
-      <td className="py-1.5 px-3 text-xs text-center">{p.headshots}</td>
-    </tr>
-  );
+function formatDuration(raw: string | number) {
+  const secs = typeof raw === "number" ? raw : parseInt(String(raw), 10);
+  if (isNaN(secs) || secs <= 0) return "—";
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
-function MatchCard({ match }: { match: Match }) {
-  const [expanded, setExpanded] = useState(false);
-  const [detail, setDetail] = useState<MatchDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
+const MODE_LABELS: Record<number, string> = {
+  0: "Deathmatch",
+  1: "Team DM",
+  2: "Domination",
+  3: "Search & Destroy",
+  4: "Escort",
+  5: "Free For All",
+};
 
-  async function toggleExpand() {
-    if (expanded) {
-      setExpanded(false);
-      return;
-    }
-    setExpanded(true);
-    if (detail) return;
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
-      const res = await fetch(`/api/live-matches/${match.guid}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
-      setDetail(body as MatchDetail);
-    } catch (err) {
-      setDetailError(err instanceof Error ? err.message : "Failed to load details.");
-    } finally {
-      setDetailLoading(false);
-    }
+const MAP_LABELS: Record<number, string> = {
+  // add known map IDs here as they become available
+};
+
+function modeLabel(mode: number) {
+  return MODE_LABELS[mode] ?? `Mode ${mode}`;
+}
+function mapLabel(map: number) {
+  return MAP_LABELS[map] ?? `Map ${map}`;
+}
+
+/* ── Pagination control ─────────────────────────────────── */
+function Pagination({
+  page,
+  totalPages,
+  isFirst,
+  isLast,
+  onGo,
+}: {
+  page: number;
+  totalPages: number;
+  isFirst: boolean;
+  isLast: boolean;
+  onGo: (p: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+
+  // Compute window of page numbers to show
+  const range: number[] = [];
+  const delta = 2;
+  for (let i = Math.max(0, page - delta); i <= Math.min(totalPages - 1, page + delta); i++) {
+    range.push(i);
   }
 
-  const statusColor =
-    match.status === "in_progress"
-      ? "bg-green-900/60 text-green-300"
-      : match.status === "waiting"
-      ? "bg-yellow-900/60 text-yellow-300"
-      : "bg-[var(--panel-2)] text-[var(--text-dim)]";
-
-  const players = detail
-    ? detail.is_ffa
-      ? detail.all_players
-      : [...(detail.red_team ?? []), ...(detail.blue_team ?? [])]
-    : [];
-
   return (
-    <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
-      {/* Map image banner */}
-      {match.map_image && (
-        <div className="h-24 bg-black/40 overflow-hidden relative">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={match.map_image}
-            alt={match.map_name}
-            className="w-full h-full object-cover opacity-60"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--panel)] to-transparent" />
-          <div className="absolute bottom-2 left-3 text-sm font-semibold">{match.map_name}</div>
-        </div>
+    <div className="flex items-center justify-center gap-1 mt-4 flex-wrap">
+      <button
+        disabled={isFirst}
+        onClick={() => onGo(0)}
+        className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white disabled:opacity-30"
+      >
+        «
+      </button>
+      <button
+        disabled={isFirst}
+        onClick={() => onGo(page - 1)}
+        className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white disabled:opacity-30"
+      >
+        ‹
+      </button>
+      {range[0] > 0 && (
+        <>
+          <button onClick={() => onGo(0)} className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white">
+            1
+          </button>
+          {range[0] > 1 && <span className="text-[var(--text-dim)] text-xs px-1">…</span>}
+        </>
       )}
-      {!match.map_image && (
-        <div className="h-10 flex items-center px-3">
-          <span className="font-semibold text-sm">{match.map_name}</span>
-        </div>
-      )}
-
-      {/* Match info */}
-      <div className="px-3 pb-3">
-        <div className="flex flex-wrap gap-1.5 mb-2 mt-1">
-          <Badge color={statusColor}>{match.status.replace(/_/g, " ")}</Badge>
-          <Badge>{match.game_mode}</Badge>
-          <Badge>
-            {match.player_count}/{match.max_players} players
-          </Badge>
-        </div>
-        <div className="text-xs text-[var(--text-dim)] font-mono truncate">{match.guid}</div>
+      {range.map((p) => (
         <button
-          onClick={toggleExpand}
-          className="mt-2 w-full text-xs px-3 py-1.5 rounded-md border text-[var(--text-dim)] hover:text-white hover:border-[var(--accent)] transition-colors"
+          key={p}
+          onClick={() => onGo(p)}
+          className={`px-2.5 py-1 rounded text-xs border transition-colors ${
+            p === page
+              ? "bg-[var(--accent)] border-[var(--accent)] text-white"
+              : "text-[var(--text-dim)] hover:text-white"
+          }`}
         >
-          {expanded ? "Hide Players" : "Show Players"}
+          {p + 1}
         </button>
-      </div>
-
-      {/* Expandable player list */}
-      {expanded && (
-        <div className="border-t">
-          {detailLoading && (
-            <p className="text-xs text-[var(--text-dim)] px-3 py-3">Loading players…</p>
+      ))}
+      {range[range.length - 1] < totalPages - 1 && (
+        <>
+          {range[range.length - 1] < totalPages - 2 && (
+            <span className="text-[var(--text-dim)] text-xs px-1">…</span>
           )}
-          {detailError && (
-            <p className="text-xs text-[var(--danger)] px-3 py-3">{detailError}</p>
-          )}
-          {detail && players.length === 0 && (
-            <p className="text-xs text-[var(--text-dim)] px-3 py-3">No player data available.</p>
-          )}
-          {detail && players.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-[var(--text-dim)] border-b border-[var(--panel)]">
-                    <th className="py-1.5 px-3 text-left">Codename</th>
-                    <th className="py-1.5 px-3 text-left">Team</th>
-                    <th className="py-1.5 px-3 text-center">Rank</th>
-                    <th className="py-1.5 px-3 text-center">K</th>
-                    <th className="py-1.5 px-3 text-center">D</th>
-                    <th className="py-1.5 px-3 text-center">A</th>
-                    <th className="py-1.5 px-3 text-center">HS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {players.map((p) => (
-                    <PlayerRow key={p.player_guid} p={p} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+          <button onClick={() => onGo(totalPages - 1)} className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white">
+            {totalPages}
+          </button>
+        </>
       )}
+      <button
+        disabled={isLast}
+        onClick={() => onGo(page + 1)}
+        className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white disabled:opacity-30"
+      >
+        ›
+      </button>
+      <button
+        disabled={isLast}
+        onClick={() => onGo(totalPages - 1)}
+        className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white disabled:opacity-30"
+      >
+        »
+      </button>
     </div>
   );
 }
 
+/* ── Main component ─────────────────────────────────────── */
 export default function LiveMatchesView() {
+  const [inputGuid, setInputGuid] = useState("");
+  const [searchedGuid, setSearchedGuid] = useState<string | null>(null);
   const [data, setData] = useState<MatchesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async () => {
+  async function fetchPage(guid: string, page: number) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/live-matches");
+      const res = await fetch(
+        `/api/search-matches?guid=${encodeURIComponent(guid)}&page=${page}`,
+      );
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
       setData(body as MatchesResponse);
-      setLastUpdated(new Date());
+      setSearchedGuid(guid);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
+      setData(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const g = inputGuid.trim();
+    if (!g) return;
+    fetchPage(g, 0);
+  }
 
-  useEffect(() => {
-    if (!autoRefresh) {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      return;
-    }
-    timerRef.current = setTimeout(() => load(), REFRESH_INTERVAL);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [autoRefresh, load, lastUpdated]);
+  function handlePageChange(page: number) {
+    if (searchedGuid) fetchPage(searchedGuid, page);
+  }
 
-  const matches = data?.matches ?? [];
+  const items = data?.items ?? [];
 
   return (
     <div>
-      {/* Toolbar */}
-      <div className="flex items-center gap-4 mb-4 bg-[var(--panel)] border rounded-lg px-4 py-3">
-        <div className="flex-1 text-sm text-[var(--text-dim)]">
-          {lastUpdated ? (
-            <>Last updated: {lastUpdated.toLocaleTimeString()}</>
-          ) : (
-            "—"
-          )}
-          {data && (
-            <span className="ml-3 font-medium text-white">{data.total} active</span>
-          )}
-        </div>
+      {/* Search bar */}
+      <form
+        onSubmit={handleSearch}
+        className="flex gap-2 mb-6"
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputGuid}
+          onChange={(e) => setInputGuid(e.target.value)}
+          placeholder="Enter player GUID (e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+          className="flex-1 bg-[var(--panel)] border rounded-lg px-4 py-2.5 text-sm font-mono placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
+          spellCheck={false}
+          autoComplete="off"
+        />
         <button
-          onClick={load}
-          disabled={loading}
-          className="px-3 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40"
+          type="submit"
+          disabled={loading || !inputGuid.trim()}
+          className="px-5 py-2.5 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
         >
-          {loading ? "Refreshing…" : "Refresh"}
+          {loading ? "Searching…" : "Search"}
         </button>
-        <label className="flex items-center gap-2 text-sm text-[var(--text-dim)] cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={autoRefresh}
-            onChange={(e) => setAutoRefresh(e.target.checked)}
-            className="accent-[var(--accent)]"
-          />
-          Auto-refresh (30s)
-        </label>
-      </div>
+      </form>
 
-      {loading && !data && (
-        <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">
-          Loading…
+      {/* Error */}
+      {error && (
+        <div className="bg-[var(--panel)] border border-red-800 rounded-lg p-4 text-[var(--danger)] text-sm mb-4">
+          {error}
         </div>
       )}
-      {!loading && error && (
-        <div className="bg-[var(--panel)] border rounded-lg p-6 text-[var(--danger)]">{error}</div>
-      )}
-      {!loading && !error && data && matches.length === 0 && (
+
+      {/* No results */}
+      {!loading && !error && data && items.length === 0 && (
         <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">
-          No active matches right now.
+          No match history found for this player.
         </div>
       )}
-      {matches.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {matches.map((m) => (
-            <MatchCard key={m.guid} match={m} />
-          ))}
+
+      {/* Results */}
+      {data && items.length > 0 && (
+        <>
+          {/* Summary bar */}
+          <div className="flex items-center justify-between mb-3 px-1">
+            <p className="text-sm text-[var(--text-dim)]">
+              <span className="font-mono text-white">{searchedGuid}</span>
+              {" — "}
+              <span className="text-white font-medium">{data.totalCount}</span> match
+              {data.totalCount !== 1 ? "es" : ""} total
+            </p>
+            <p className="text-xs text-[var(--text-dim)]">
+              Page {data.page + 1} of {data.total_pages}
+            </p>
+          </div>
+
+          {/* Top pagination */}
+          <Pagination
+            page={data.page}
+            totalPages={data.total_pages}
+            isFirst={data.first}
+            isLast={data.last}
+            onGo={handlePageChange}
+          />
+
+          {/* Table */}
+          <div className="mt-4 overflow-x-auto bg-[var(--panel)] border rounded-lg">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-[var(--text-dim)] border-b border-[var(--panel-2)]">
+                  <th className="py-2.5 px-3 text-left whitespace-nowrap">Date</th>
+                  <th className="py-2.5 px-3 text-left whitespace-nowrap">Map</th>
+                  <th className="py-2.5 px-3 text-left whitespace-nowrap">Mode</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">Team</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">Result</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">K</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">D</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">A</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">HS</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">XP</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">Duration</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">Rounds W/L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const teamColor =
+                    item.team?.toLowerCase() === "red"
+                      ? "text-red-400"
+                      : item.team?.toLowerCase() === "blue"
+                      ? "text-blue-400"
+                      : "text-[var(--text-dim)]";
+
+                  return (
+                    <tr
+                      key={item.match_result_guid}
+                      className="border-b border-[var(--panel-2)] last:border-0 hover:bg-[var(--panel-2)] transition-colors"
+                    >
+                      <td className="py-2 px-3 text-xs whitespace-nowrap">
+                        {formatDate(item.date_added)}
+                      </td>
+                      <td className="py-2 px-3 text-xs whitespace-nowrap">
+                        {mapLabel(item.map)}
+                      </td>
+                      <td className="py-2 px-3 text-xs whitespace-nowrap">
+                        {modeLabel(item.mode)}
+                      </td>
+                      <td className={`py-2 px-3 text-xs text-center font-medium ${teamColor}`}>
+                        {item.team || "—"}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-center">
+                        {item.won ? (
+                          <span className="px-1.5 py-0.5 rounded bg-green-900/60 text-green-300 text-xs font-medium">
+                            WIN
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 text-xs font-medium">
+                            LOSS
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-center font-medium text-white">
+                        {item.kills}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-center">
+                        {item.deaths}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-center">
+                        {item.assists}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-center">
+                        {item.headshots}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-center">
+                        {item.experience}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-center">
+                        {formatDuration(item.match_time)}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-center">
+                        {item.round_wins}/{item.round_loses}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bottom pagination */}
+          <Pagination
+            page={data.page}
+            totalPages={data.total_pages}
+            isFirst={data.first}
+            isLast={data.last}
+            onGo={handlePageChange}
+          />
+        </>
+      )}
+
+      {/* Initial empty state */}
+      {!loading && !error && !data && (
+        <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">
+          Enter a player GUID above to look up their match history.
         </div>
       )}
     </div>

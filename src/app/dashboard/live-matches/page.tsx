@@ -10,7 +10,10 @@ export default async function LiveMatchesPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-semibold mb-4">Live Matches</h1>
+      <h1 className="text-xl font-semibold mb-1">Search Matches</h1>
+      <p className="text-sm text-[var(--text-dim)] mb-6">
+        Look up a player&apos;s match history by their GUID.
+      </p>
       <LiveMatchesView />
     </div>
   );
