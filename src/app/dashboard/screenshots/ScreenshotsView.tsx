@@ -178,9 +178,9 @@ export default function ScreenshotsView() {
                   className="w-full h-full object-cover group-hover:opacity-90"
                 />
               </div>
-              <div className="p-2.5 text-xs">
-                <div className="font-mono truncate text-[var(--text-dim)]">{it.player_guid}</div>
-                <div className="text-[var(--text-dim)] mt-0.5">{fmtDate(it.time)}</div>
+              <div className="p-2.5">
+                <div className="font-mono truncate text-sm font-semibold">{it.player_guid}</div>
+                <div className="text-[var(--text-dim)] text-xs mt-0.5">{fmtDate(it.time)}</div>
               </div>
             </button>
           ))}
