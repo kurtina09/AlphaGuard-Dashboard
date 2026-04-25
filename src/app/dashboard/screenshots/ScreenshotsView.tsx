@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Item = {
   unique_id: string;
@@ -122,10 +122,12 @@ export default function ScreenshotsView() {
   const [error, setError] = useState<string | null>(null);
 
   const [lightbox, setLightbox] = useState<Item | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number>(-1);
   const [playerInfo, setPlayerInfo] = useState<PlayerInfo | null>(null);
   const [playerLoading, setPlayerLoading] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const itemsRef = useRef<Item[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,8 +148,12 @@ export default function ScreenshotsView() {
 
   useEffect(() => { load(); }, [load]);
 
-  function openLightbox(item: Item) {
+  // Keep a ref of current items for keyboard navigation
+  useEffect(() => { itemsRef.current = data?.items ?? []; }, [data]);
+
+  function openLightbox(item: Item, index: number) {
     setLightbox(item);
+    setLightboxIndex(index);
     setPlayerInfo(null);
     setPlayerError(null);
     setZoom(1);
@@ -155,10 +161,36 @@ export default function ScreenshotsView() {
 
   function closeLightbox() {
     setLightbox(null);
+    setLightboxIndex(-1);
     setPlayerInfo(null);
     setPlayerError(null);
     setZoom(1);
   }
+
+  function navigateLightbox(dir: 1 | -1) {
+    const items = itemsRef.current;
+    if (!items.length) return;
+    const next = lightboxIndex + dir;
+    if (next < 0 || next >= items.length) return;
+    setLightbox(items[next]);
+    setLightboxIndex(next);
+    setPlayerInfo(null);
+    setPlayerError(null);
+    setZoom(1);
+  }
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!lightbox) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft") navigateLightbox(-1);
+      else if (e.key === "ArrowRight") navigateLightbox(1);
+      else if (e.key === "Escape") closeLightbox();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightbox, lightboxIndex]);
 
   function handleWheel(e: React.WheelEvent) {
     e.preventDefault();
@@ -255,10 +287,10 @@ export default function ScreenshotsView() {
       )}
       {!loading && !error && data && data.items.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {data.items.map((it) => (
+          {data.items.map((it, idx) => (
             <button
               key={it.unique_id}
-              onClick={() => openLightbox(it)}
+              onClick={() => openLightbox(it, idx)}
               className="group text-left bg-[var(--panel)] border rounded-lg overflow-hidden hover:border-[var(--accent)] transition-colors"
             >
               <div className="aspect-video bg-black/40 overflow-hidden">
@@ -321,24 +353,45 @@ export default function ScreenshotsView() {
               </div>
             </div>
 
-            {/* Screenshot */}
-            <div
-              className="bg-black overflow-auto"
-              style={{ maxHeight: '60vh' }}
-              onWheel={handleWheel}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/screenshots/${lightbox.unique_id}`}
-                alt={`screenshot ${lightbox.unique_id}`}
-                onClick={() => setZoom(z => z >= 4 ? 1 : +(z + 0.5).toFixed(2))}
-                style={{
-                  display: 'block',
-                  width: `${zoom * 100}%`,
-                  cursor: zoom < 4 ? 'zoom-in' : 'zoom-out',
-                  transition: 'width 0.15s ease',
-                }}
-              />
+            {/* Screenshot with side arrows */}
+            <div className="relative flex items-stretch bg-black">
+              {/* Left arrow */}
+              <button
+                onClick={() => navigateLightbox(-1)}
+                disabled={lightboxIndex <= 0}
+                className="shrink-0 w-12 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-2xl"
+              >
+                ‹
+              </button>
+
+              {/* Image */}
+              <div
+                className="flex-1 overflow-auto"
+                style={{ maxHeight: '60vh' }}
+                onWheel={handleWheel}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/screenshots/${lightbox.unique_id}`}
+                  alt={`screenshot ${lightbox.unique_id}`}
+                  onClick={() => setZoom(z => z >= 4 ? 1 : +(z + 0.5).toFixed(2))}
+                  style={{
+                    display: 'block',
+                    width: `${zoom * 100}%`,
+                    cursor: zoom < 4 ? 'zoom-in' : 'zoom-out',
+                    transition: 'width 0.15s ease',
+                  }}
+                />
+              </div>
+
+              {/* Right arrow */}
+              <button
+                onClick={() => navigateLightbox(1)}
+                disabled={lightboxIndex >= (itemsRef.current.length - 1)}
+                className="shrink-0 w-12 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-2xl"
+              >
+                ›
+              </button>
             </div>
 
             {/* Player info section */}
