@@ -22,8 +22,7 @@ export async function GET(req: Request) {
     const res = await acFetch(`/auth/ac-detections?${qs.toString()}`);
     const body = await res.json().catch(() => null);
     if (!res.ok) {
-      console.error(`[detections] upstream ${res.status}:`, JSON.stringify(body));
-      return NextResponse.json(
+return NextResponse.json(
         { error: body?.diagnostics?.message || `Upstream error (${res.status})` },
         { status: res.status },
       );
