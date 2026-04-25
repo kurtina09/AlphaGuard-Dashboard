@@ -150,6 +150,7 @@ export default function DetectionsView() {
               <tr>
                 <th className="px-4 py-2.5 font-medium">Date</th>
                 <th className="px-4 py-2.5 font-medium">Codename</th>
+                <th className="px-4 py-2.5 font-medium">Player GUID</th>
                 <th className="px-4 py-2.5 font-medium">Reason</th>
                 <th className="px-4 py-2.5 font-medium">Action</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
@@ -158,21 +159,21 @@ export default function DetectionsView() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-[var(--text-dim)]">
+                  <td colSpan={6} className="px-4 py-10 text-center text-[var(--text-dim)]">
                     Loading…
                   </td>
                 </tr>
               )}
               {!loading && error && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-[var(--danger)]">
+                  <td colSpan={6} className="px-4 py-10 text-center text-[var(--danger)]">
                     {error}
                   </td>
                 </tr>
               )}
               {!loading && !error && data && data.items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-[var(--text-dim)]">
+                  <td colSpan={6} className="px-4 py-10 text-center text-[var(--text-dim)]">
                     No detections found.
                   </td>
                 </tr>
@@ -185,6 +186,9 @@ export default function DetectionsView() {
                       {fmtDate(d.date_added)}
                     </td>
                     <td className="px-4 py-2.5 font-medium">{d.codename || "—"}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="font-mono text-xs text-[var(--text-dim)]">{d.player_guid || "—"}</span>
+                    </td>
                     <td className="px-4 py-2.5 max-w-md">
                       <div className="truncate" title={d.reason}>
                         {d.reason}
