@@ -112,14 +112,25 @@ function getFreshnessStyle(
   if (maxMs === minMs) return {};
   const t = new Date(time).getTime();
   const freshness = (t - minMs) / (maxMs - minMs); // 0 = oldest, 1 = newest
-  if (freshness < 0.01) return {};
-  // Green glow: border + subtle background tint
-  const borderOpacity = 0.3 + freshness * 0.7;
-  const bgOpacity = freshness * 0.08;
+
+  // Interpolate red → yellow → green based on freshness
+  let r: number, g: number, b: number;
+  if (freshness < 0.5) {
+    // red → yellow (freshness 0 → 0.5)
+    const f = freshness / 0.5;
+    r = 248; g = Math.round(113 + f * (212 - 113)); b = 113;
+  } else {
+    // yellow → green (freshness 0.5 → 1)
+    const f = (freshness - 0.5) / 0.5;
+    r = Math.round(250 - f * (250 - 74)); g = Math.round(212 + f * (222 - 212)); b = Math.round(113 - f * (113 - 128));
+  }
+
+  const borderOpacity = 0.35 + freshness * 0.55;
+  const bgOpacity = 0.04 + freshness * 0.06;
   return {
-    borderColor: `rgba(74, 222, 128, ${borderOpacity})`,
-    backgroundColor: `rgba(74, 222, 128, ${bgOpacity})`,
-    boxShadow: freshness > 0.8 ? `0 0 8px rgba(74, 222, 128, ${freshness * 0.3})` : undefined,
+    borderColor: `rgba(${r}, ${g}, ${b}, ${borderOpacity})`,
+    backgroundColor: `rgba(${r}, ${g}, ${b}, ${bgOpacity})`,
+    boxShadow: `0 0 6px rgba(${r}, ${g}, ${b}, ${0.1 + freshness * 0.2})`,
   };
 }
 
