@@ -226,6 +226,14 @@ export default function ScreenshotsView() {
         </button>
         <button
           type="button"
+          disabled={!data || data.first || loading}
+          onClick={() => setPage((p) => Math.max(0, p - 1))}
+          className="px-4 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
           disabled={!data || data.last || loading}
           onClick={() => setPage((p) => p + 1)}
           className="px-4 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
