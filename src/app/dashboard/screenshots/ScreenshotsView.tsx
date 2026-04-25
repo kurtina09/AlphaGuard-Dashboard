@@ -104,6 +104,25 @@ function Pagination({
   );
 }
 
+function getFreshnessStyle(
+  time: string,
+  minMs: number,
+  maxMs: number,
+): React.CSSProperties {
+  if (maxMs === minMs) return {};
+  const t = new Date(time).getTime();
+  const freshness = (t - minMs) / (maxMs - minMs); // 0 = oldest, 1 = newest
+  if (freshness < 0.01) return {};
+  // Green glow: border + subtle background tint
+  const borderOpacity = 0.3 + freshness * 0.7;
+  const bgOpacity = freshness * 0.08;
+  return {
+    borderColor: `rgba(74, 222, 128, ${borderOpacity})`,
+    backgroundColor: `rgba(74, 222, 128, ${bgOpacity})`,
+    boxShadow: freshness > 0.8 ? `0 0 8px rgba(74, 222, 128, ${freshness * 0.3})` : undefined,
+  };
+}
+
 function StatCell({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="bg-[var(--panel-2)] rounded-md px-3 py-2">
@@ -226,6 +245,11 @@ export default function ScreenshotsView() {
 
   const totalPages = data?.total_pages ?? 0;
 
+  // Compute freshness range for current page
+  const timestamps = data?.items.map((it) => new Date(it.time).getTime()).filter(Boolean) ?? [];
+  const minMs = timestamps.length ? Math.min(...timestamps) : 0;
+  const maxMs = timestamps.length ? Math.max(...timestamps) : 0;
+
   return (
     <>
       <form
@@ -291,7 +315,11 @@ export default function ScreenshotsView() {
             <button
               key={it.unique_id}
               onClick={() => openLightbox(it, idx)}
-              className="group text-left bg-[var(--panel)] border rounded-lg overflow-hidden hover:border-[var(--accent)] transition-colors"
+              className="group text-left border rounded-lg overflow-hidden transition-colors"
+              style={{
+                backgroundColor: 'var(--panel)',
+                ...getFreshnessStyle(it.time, minMs, maxMs),
+              }}
             >
               <div className="aspect-video bg-black/40 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
