@@ -113,25 +113,38 @@ function getFreshnessStyle(
   const t = new Date(time).getTime();
   const freshness = (t - minMs) / (maxMs - minMs); // 0 = oldest, 1 = newest
 
-  // Interpolate red → yellow → green based on freshness
-  let r: number, g: number, b: number;
-  if (freshness < 0.5) {
-    // red → yellow (freshness 0 → 0.5)
-    const f = freshness / 0.5;
-    r = 248; g = Math.round(113 + f * (212 - 113)); b = 113;
-  } else {
-    // yellow → green (freshness 0.5 → 1)
-    const f = (freshness - 0.5) / 0.5;
-    r = Math.round(250 - f * (250 - 74)); g = Math.round(212 + f * (222 - 212)); b = Math.round(113 - f * (113 - 128));
+  // Zone 1: freshness >= 0.70 → bright green border
+  if (freshness >= 0.70) {
+    const intensity = (freshness - 0.70) / 0.30; // 0→1 within zone
+    return {
+      borderColor: `rgba(74, 222, 128, ${0.6 + intensity * 0.4})`,
+      backgroundColor: `rgba(74, 222, 128, ${0.04 + intensity * 0.06})`,
+      boxShadow: `0 0 ${6 + intensity * 6}px rgba(74, 222, 128, ${0.2 + intensity * 0.3})`,
+    };
   }
 
-  const borderOpacity = 0.35 + freshness * 0.55;
-  const bgOpacity = 0.04 + freshness * 0.06;
-  return {
-    borderColor: `rgba(${r}, ${g}, ${b}, ${borderOpacity})`,
-    backgroundColor: `rgba(${r}, ${g}, ${b}, ${bgOpacity})`,
-    boxShadow: `0 0 6px rgba(${r}, ${g}, ${b}, ${0.1 + freshness * 0.2})`,
-  };
+  // Zone 2: freshness 0.40–0.70 → subtle orange border
+  if (freshness >= 0.40) {
+    const intensity = (freshness - 0.40) / 0.30; // 0→1 within zone
+    return {
+      borderColor: `rgba(251, 146, 60, ${0.3 + intensity * 0.4})`,
+      backgroundColor: `rgba(251, 146, 60, ${0.02 + intensity * 0.04})`,
+      boxShadow: `0 0 4px rgba(251, 146, 60, ${0.1 + intensity * 0.15})`,
+    };
+  }
+
+  // Zone 3: freshness 0.15–0.40 → soft red glow
+  if (freshness >= 0.15) {
+    const intensity = (freshness - 0.15) / 0.25; // 0→1 within zone
+    return {
+      borderColor: `rgba(248, 113, 113, ${0.2 + intensity * 0.2})`,
+      backgroundColor: `rgba(248, 113, 113, ${0.02 + intensity * 0.02})`,
+      boxShadow: `0 0 4px rgba(248, 113, 113, ${0.05 + intensity * 0.1})`,
+    };
+  }
+
+  // Zone 4: freshness < 0.15 → no color (oldest)
+  return {};
 }
 
 function StatCell({ label, value }: { label: string; value: string | number }) {
