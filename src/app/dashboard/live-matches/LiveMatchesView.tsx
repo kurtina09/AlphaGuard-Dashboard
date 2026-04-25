@@ -92,27 +92,32 @@ function Pagination({
   isLast: boolean;
   onGo: (p: number) => void;
 }) {
-  if (totalPages <= 1) return null;
+  const safePage = isNaN(page) || page < 0 ? 0 : page;
+  const safeTotal = isNaN(totalPages) || totalPages < 1 ? 1 : totalPages;
+  const atFirst = !!isFirst || safePage === 0;
+  const atLast = !!isLast || safePage >= safeTotal - 1;
+
+  if (safeTotal <= 1) return null;
 
   // Compute window of page numbers to show
   const range: number[] = [];
   const delta = 2;
-  for (let i = Math.max(0, page - delta); i <= Math.min(totalPages - 1, page + delta); i++) {
+  for (let i = Math.max(0, safePage - delta); i <= Math.min(safeTotal - 1, safePage + delta); i++) {
     range.push(i);
   }
 
   return (
     <div className="flex items-center justify-center gap-1 mt-4 flex-wrap">
       <button
-        disabled={isFirst}
+        disabled={atFirst}
         onClick={() => onGo(0)}
         className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white disabled:opacity-30"
       >
         «
       </button>
       <button
-        disabled={isFirst}
-        onClick={() => onGo(page - 1)}
+        disabled={atFirst}
+        onClick={() => onGo(safePage - 1)}
         className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white disabled:opacity-30"
       >
         ‹
@@ -130,7 +135,7 @@ function Pagination({
           key={p}
           onClick={() => onGo(p)}
           className={`px-2.5 py-1 rounded text-xs border transition-colors ${
-            p === page
+            p === safePage
               ? "bg-[var(--accent)] border-[var(--accent)] text-white"
               : "text-[var(--text-dim)] hover:text-white"
           }`}
@@ -138,26 +143,26 @@ function Pagination({
           {p + 1}
         </button>
       ))}
-      {range[range.length - 1] < totalPages - 1 && (
+      {range[range.length - 1] < safeTotal - 1 && (
         <>
-          {range[range.length - 1] < totalPages - 2 && (
+          {range[range.length - 1] < safeTotal - 2 && (
             <span className="text-[var(--text-dim)] text-xs px-1">…</span>
           )}
-          <button onClick={() => onGo(totalPages - 1)} className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white">
-            {totalPages}
+          <button onClick={() => onGo(safeTotal - 1)} className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white">
+            {safeTotal}
           </button>
         </>
       )}
       <button
-        disabled={isLast}
-        onClick={() => onGo(page + 1)}
+        disabled={atLast}
+        onClick={() => onGo(safePage + 1)}
         className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white disabled:opacity-30"
       >
         ›
       </button>
       <button
-        disabled={isLast}
-        onClick={() => onGo(totalPages - 1)}
+        disabled={atLast}
+        onClick={() => onGo(safeTotal - 1)}
         className="px-2 py-1 rounded text-xs border text-[var(--text-dim)] hover:text-white disabled:opacity-30"
       >
         »
@@ -176,11 +181,12 @@ export default function LiveMatchesView() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function fetchPage(guid: string, page: number) {
+    const safePage = isNaN(page) || page < 0 ? 0 : Math.floor(page);
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(
-        `/api/search-matches?guid=${encodeURIComponent(guid)}&page=${page}`,
+        `/api/search-matches?guid=${encodeURIComponent(guid)}&page=${safePage}`,
       );
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `Error ${res.status}`);

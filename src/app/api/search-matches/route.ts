@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const guid = searchParams.get("guid")?.trim();
-  const page = searchParams.get("page") ?? "0";
+  const rawPage = parseInt(searchParams.get("page") ?? "0", 10);
+  const page = isNaN(rawPage) || rawPage < 0 ? 0 : rawPage;
 
   if (!guid) {
     return NextResponse.json({ error: "Missing player GUID." }, { status: 400 });
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
   }
 
   const token = session.token!;
-  const url = `${UPSTREAM}/player/matches/${encodeURIComponent(guid)}?page=${page}`;
+  const url = `${UPSTREAM}/player/matches/${encodeURIComponent(guid)}?page=${page.toString()}`;
 
   let res: Response;
   try {
