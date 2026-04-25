@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/session";
-
-const UPSTREAM = process.env.GAME_API_BASE ?? "https://api.sf-alpha.com/v2";
-const upstreamHost = new URL(UPSTREAM).host;
-
-function authHeaders(token: string) {
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-    host: upstreamHost,
-    origin: `https://${upstreamHost}`,
-    referer: `https://${upstreamHost}/`,
-  };
-}
+import { acFetch } from "@/lib/ac-token";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -32,15 +20,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid player GUID format." }, { status: 400 });
   }
 
-  const token = session.token!;
-  const url = `${UPSTREAM}/player/matches/${encodeURIComponent(guid)}?page=${page.toString()}`;
-
   let res: Response;
   try {
-    res = await fetch(url, {
-      headers: authHeaders(token),
-      cache: "no-store",
-    });
+    res = await acFetch(`/player/matches/${encodeURIComponent(guid)}?page=${page}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Network error";
     return NextResponse.json({ error: msg }, { status: 502 });
