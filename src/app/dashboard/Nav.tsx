@@ -14,10 +14,11 @@ export default function Nav({
   const router = useRouter();
 
   const links = [
-    { href: "/dashboard/detections", label: "Detections" },
     { href: "/dashboard/screenshots", label: "Screenshots" },
-    { href: "/dashboard/live-matches", label: "Live Matches" },
     { href: "/dashboard/ban", label: "Ban / Kick" },
+    { href: "/dashboard/detections", label: "Detections" },
+    { href: "/dashboard/live-matches", label: "Live Matches" },
+    { href: "/dashboard/watchlist", label: "Watch List" },
   ];
 
   async function logout() {
