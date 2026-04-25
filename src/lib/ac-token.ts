@@ -11,7 +11,9 @@ async function refreshToken(): Promise<string> {
       "AC_USERNAME / AC_PASSWORD missing — set them in .env.local to access the detections API.",
     );
   }
+  console.log(`[ac-token] refreshing token for ${username}`);
   const result = await login(username, password);
+  console.log(`[ac-token] token refreshed OK`);
   cachedToken = result.token;
   return cachedToken;
 }
