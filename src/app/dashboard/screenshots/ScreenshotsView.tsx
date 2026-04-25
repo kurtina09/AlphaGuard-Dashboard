@@ -38,6 +38,72 @@ function fmtDate(s: string) {
   return d.toLocaleString();
 }
 
+function Pagination({
+  data,
+  loading,
+  setPage,
+}: {
+  data: PageResponse;
+  loading: boolean;
+  setPage: React.Dispatch<React.SetStateAction<number>>;
+}) {
+  const current = data.page;
+  const total = data.total_pages;
+  if (total <= 1) return null;
+
+  const delta = 2;
+  const pages: (number | "…")[] = [];
+  const rangeStart = Math.max(0, current - delta);
+  const rangeEnd = Math.min(total - 1, current + delta);
+  if (rangeStart > 0) {
+    pages.push(0);
+    if (rangeStart > 1) pages.push("…");
+  }
+  for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
+  if (rangeEnd < total - 1) {
+    if (rangeEnd < total - 2) pages.push("…");
+    pages.push(total - 1);
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-xs text-[var(--text-dim)] text-center">
+        Page {current + 1} of {total} · {data.total_count} total
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-1 text-sm">
+        <button
+          disabled={data.first || loading}
+          onClick={() => setPage((p) => Math.max(0, p - 1))}
+          className="px-3 py-1.5 rounded-md border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        >‹</button>
+        {pages.map((p, i) =>
+          p === "…" ? (
+            <span key={`ellipsis-${i}`} className="px-2 py-1.5 text-[var(--text-dim)]">…</span>
+          ) : (
+            <button
+              key={p}
+              disabled={loading}
+              onClick={() => setPage(p)}
+              className={`px-3 py-1.5 rounded-md border transition-colors disabled:cursor-not-allowed ${
+                p === current
+                  ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                  : "text-[var(--text-dim)] hover:text-white"
+              }`}
+            >
+              {p + 1}
+            </button>
+          )
+        )}
+        <button
+          disabled={data.last || loading}
+          onClick={() => setPage((p) => p + 1)}
+          className="px-3 py-1.5 rounded-md border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+        >›</button>
+      </div>
+    </div>
+  );
+}
+
 function StatCell({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="bg-[var(--panel-2)] rounded-md px-3 py-2">
@@ -168,6 +234,8 @@ export default function ScreenshotsView() {
         </button>
       </form>
 
+      {data && <Pagination data={data} loading={loading} setPage={setPage} />}
+
       {loading && (
         <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">Loading…</div>
       )}
@@ -203,72 +271,7 @@ export default function ScreenshotsView() {
         </div>
       )}
 
-      {data && totalPages > 1 && (
-        <div className="flex flex-col gap-2 mt-4">
-          <div className="text-xs text-[var(--text-dim)] text-center">
-            Page {data.page + 1} of {totalPages} · {data.total_count} total
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-1 text-sm">
-            {/* Previous */}
-            <button
-              disabled={data.first || loading}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              className="px-3 py-1.5 rounded-md border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              ‹
-            </button>
-
-            {/* Page numbers with ellipsis */}
-            {(() => {
-              const current = data.page;
-              const total = totalPages;
-              const delta = 2;
-              const pages: (number | "…")[] = [];
-
-              const rangeStart = Math.max(0, current - delta);
-              const rangeEnd = Math.min(total - 1, current + delta);
-
-              if (rangeStart > 0) {
-                pages.push(0);
-                if (rangeStart > 1) pages.push("…");
-              }
-              for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
-              if (rangeEnd < total - 1) {
-                if (rangeEnd < total - 2) pages.push("…");
-                pages.push(total - 1);
-              }
-
-              return pages.map((p, i) =>
-                p === "…" ? (
-                  <span key={`ellipsis-${i}`} className="px-2 py-1.5 text-[var(--text-dim)]">…</span>
-                ) : (
-                  <button
-                    key={p}
-                    disabled={loading}
-                    onClick={() => setPage(p)}
-                    className={`px-3 py-1.5 rounded-md border transition-colors disabled:cursor-not-allowed ${
-                      p === current
-                        ? "bg-[var(--accent)] text-white border-[var(--accent)]"
-                        : "text-[var(--text-dim)] hover:text-white"
-                    }`}
-                  >
-                    {p + 1}
-                  </button>
-                )
-              );
-            })()}
-
-            {/* Next */}
-            <button
-              disabled={data.last || loading}
-              onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 rounded-md border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              ›
-            </button>
-          </div>
-        </div>
-      )}
+      {data && <Pagination data={data} loading={loading} setPage={setPage} />}
 
       {lightbox && (
         <div
