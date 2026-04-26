@@ -147,6 +147,28 @@ function getFreshnessStyle(
   return {};
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function copy(e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  return (
+    <button
+      onClick={copy}
+      title="Copy GUID"
+      className="shrink-0 px-1.5 py-0.5 rounded text-xs border border-transparent text-[var(--text-dim)] hover:text-white hover:border-[var(--accent)] transition-colors"
+    >
+      {copied ? "✓" : "Copy"}
+    </button>
+  );
+}
+
 function StatCell({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="bg-[var(--panel-2)] rounded-md px-3 py-2">
@@ -336,10 +358,10 @@ export default function ScreenshotsView() {
       {!loading && !error && data && data.items.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {data.items.map((it, idx) => (
-            <button
+            <div
               key={it.unique_id}
               onClick={() => openLightbox(it, idx)}
-              className="group text-left border rounded-lg overflow-hidden transition-colors"
+              className="group text-left border rounded-lg overflow-hidden transition-colors cursor-pointer"
               style={{
                 backgroundColor: 'var(--panel)',
                 ...getFreshnessStyle(it.time, minMs, maxMs),
@@ -355,10 +377,13 @@ export default function ScreenshotsView() {
                 />
               </div>
               <div className="p-2.5">
-                <div className="font-mono truncate text-sm font-semibold">{it.player_guid}</div>
+                <div className="flex items-center gap-1 min-w-0">
+                  <div className="font-mono truncate text-sm font-semibold flex-1">{it.player_guid}</div>
+                  <CopyButton text={it.player_guid} />
+                </div>
                 <div className="text-[var(--text-dim)] text-xs mt-0.5">{fmtDate(it.time)}</div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -377,7 +402,10 @@ export default function ScreenshotsView() {
             {/* Header */}
             <div className="flex items-start justify-between px-4 py-3 border-b text-sm shrink-0">
               <div>
-                <div className="font-mono text-xs text-[var(--text-dim)]">{lightbox.player_guid}</div>
+                <div className="flex items-center gap-2">
+                  <div className="font-mono text-xs text-[var(--text-dim)]">{lightbox.player_guid}</div>
+                  <CopyButton text={lightbox.player_guid} />
+                </div>
                 <div className="text-[var(--text-dim)] text-xs mt-0.5">{fmtDate(lightbox.time)}</div>
               </div>
               <div className="flex items-center gap-2">
