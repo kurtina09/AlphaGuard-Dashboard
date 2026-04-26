@@ -298,9 +298,10 @@ export default function ScreenshotsView() {
 
   return (
     <>
+      <div className="sticky top-0 z-20 bg-[var(--bg)] pb-3 -mx-8 px-8 pt-1">
       <form
         onSubmit={applyFilter}
-        className="flex flex-wrap gap-3 items-end mb-4 bg-[var(--panel)] border rounded-lg p-4"
+        className="flex flex-wrap gap-3 items-end mb-3 bg-[var(--panel)] border rounded-lg p-4"
       >
         <div className="flex flex-col gap-1 flex-1 min-w-[280px]">
           <label className="text-xs text-[var(--text-dim)]">Player GUID</label>
@@ -345,6 +346,7 @@ export default function ScreenshotsView() {
       </form>
 
       {data && <Pagination data={data} loading={loading} setPage={setPage} />}
+      </div>
 
       {loading && (
         <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">Loading…</div>
