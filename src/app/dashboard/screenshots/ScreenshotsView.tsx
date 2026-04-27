@@ -197,16 +197,6 @@ export default function ScreenshotsView() {
   const [zoom, setZoom] = useState(1);
   const itemsRef = useRef<Item[]>([]);
 
-  // AI analysis state
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<{
-    flagged: boolean;
-    rules_triggered: string[];
-    verdict: string;
-    details: string;
-  } | null>(null);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -233,8 +223,6 @@ export default function ScreenshotsView() {
     setPlayerInfo(null);
     setPlayerError(null);
     setZoom(1);
-    setAnalysisResult(null);
-    setAnalysisError(null);
   }
 
   function openLightbox(item: Item, index: number) {
@@ -257,30 +245,6 @@ export default function ScreenshotsView() {
     setLightbox(items[next]);
     setLightboxIndex(next);
     resetLightboxState();
-  }
-
-  async function analyzeScreenshot(item: Item) {
-    setAnalyzing(true);
-    setAnalysisResult(null);
-    setAnalysisError(null);
-    try {
-      const res = await fetch("/api/analyze-screenshot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          unique_id: item.unique_id,
-          player_guid: item.player_guid,
-          screenshot_time: item.time,
-        }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
-      setAnalysisResult(body);
-    } catch (err) {
-      setAnalysisError(err instanceof Error ? err.message : "Analysis failed.");
-    } finally {
-      setAnalyzing(false);
-    }
   }
 
   // Keyboard navigation
@@ -518,21 +482,12 @@ export default function ScreenshotsView() {
             {/* Player info section */}
             <div className="border-t px-4 py-3 shrink-0">
               {!playerInfo && !playerLoading && !playerError && (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => loadPlayerInfo(lightbox.player_guid)}
-                    className="px-4 py-1.5 rounded-md bg-[var(--panel-2)] border text-sm text-[var(--text-dim)] hover:text-white hover:border-[var(--accent)] transition-colors"
-                  >
-                    Load Player Info
-                  </button>
-                  <button
-                    onClick={() => analyzeScreenshot(lightbox)}
-                    disabled={analyzing}
-                    className="px-4 py-1.5 rounded-md bg-[var(--panel-2)] border text-sm text-[var(--text-dim)] hover:text-white hover:border-yellow-500 disabled:opacity-50 transition-colors"
-                  >
-                    {analyzing ? "Analyzing…" : "🔍 Analyze for Cheats"}
-                  </button>
-                </div>
+                <button
+                  onClick={() => loadPlayerInfo(lightbox.player_guid)}
+                  className="px-4 py-1.5 rounded-md bg-[var(--panel-2)] border text-sm text-[var(--text-dim)] hover:text-white hover:border-[var(--accent)] transition-colors"
+                >
+                  Load Player Info
+                </button>
               )}
 
               {playerLoading && (
@@ -541,46 +496,6 @@ export default function ScreenshotsView() {
 
               {playerError && (
                 <p className="text-sm text-[var(--danger)]">{playerError}</p>
-              )}
-
-              {analyzing && (
-                <p className="text-sm text-[var(--text-dim)] mt-2">Analyzing screenshot with AI…</p>
-              )}
-              {analysisError && (
-                <p className="text-sm text-[var(--danger)] mt-2">{analysisError}</p>
-              )}
-              {analysisResult && (
-                <div className={`mt-3 rounded-lg border p-3 text-sm ${
-                  analysisResult.flagged
-                    ? "border-red-500/50 bg-red-900/20"
-                    : "border-green-500/40 bg-green-900/10"
-                }`}>
-                  <div className="flex items-center gap-2 font-semibold mb-1">
-                    {analysisResult.flagged ? (
-                      <><span className="text-red-400">⚑ Suspicious — Flagged</span></>
-                    ) : (
-                      <><span className="text-green-400">✓ No cheats detected</span></>
-                    )}
-                  </div>
-                  <p className="text-[var(--text-dim)]">{analysisResult.verdict}</p>
-                  {analysisResult.rules_triggered.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {analysisResult.rules_triggered.map((r) => (
-                        <span key={r} className="text-xs px-1.5 py-0.5 rounded bg-red-900/40 text-red-300">{r}</span>
-                      ))}
-                    </div>
-                  )}
-                  {analysisResult.details && (
-                    <p className="text-xs text-[var(--text-dim)] mt-2 leading-relaxed">{analysisResult.details}</p>
-                  )}
-                  <button
-                    onClick={() => analyzeScreenshot(lightbox)}
-                    disabled={analyzing}
-                    className="mt-2 text-xs text-[var(--text-dim)] hover:text-white underline disabled:opacity-40"
-                  >
-                    Re-analyze
-                  </button>
-                </div>
               )}
 
               {playerInfo && (
