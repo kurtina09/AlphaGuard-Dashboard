@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/session";
 import { readRules, addFlagged } from "@/lib/detection-rules-store";
+import { readSamples } from "@/lib/cheat-sample-store";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 
-async function callClaude(base64: string, mediaType: string, prompt: string) {
+type ContentBlock =
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+  | { type: "text"; text: string };
+
+async function callClaude(content: ContentBlock[]): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set in .env.local");
 
@@ -18,18 +23,7 @@ async function callClaude(base64: string, mediaType: string, prompt: string) {
     body: JSON.stringify({
       model: "claude-opus-4-5",
       max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mediaType, data: base64 },
-            },
-            { type: "text", text: prompt },
-          ],
-        },
-      ],
+      messages: [{ role: "user", content }],
     }),
   });
 
@@ -38,9 +32,7 @@ async function callClaude(base64: string, mediaType: string, prompt: string) {
     throw new Error(`Anthropic API error (${res.status}): ${err}`);
   }
 
-  const data = await res.json() as {
-    content: { type: string; text?: string }[];
-  };
+  const data = await res.json() as { content: { type: string; text?: string }[] };
   return data.content.find((b) => b.type === "text")?.text ?? "";
 }
 
@@ -58,17 +50,17 @@ export async function POST(req: NextRequest) {
 
   if (!unique_id) return NextResponse.json({ error: "unique_id is required." }, { status: 400 });
 
-  // Load enabled rules
-  const allRules = await readRules();
+  const [allRules, samples] = await Promise.all([readRules(), readSamples()]);
   const rules = allRules.filter((r) => r.enabled);
-  if (rules.length === 0) {
+
+  if (rules.length === 0 && samples.length === 0) {
     return NextResponse.json(
-      { error: "No detection rules are enabled. Add rules on the Cheat Detection page first." },
+      { error: "No detection rules or samples configured. Set them up on the Cheat Detection page." },
       { status: 400 },
     );
   }
 
-  // Fetch screenshot image from our own API
+  // Fetch screenshot image
   const origin = req.nextUrl.origin;
   const imgRes = await fetch(`${origin}/api/screenshots/${unique_id}`, { cache: "no-store" });
   if (!imgRes.ok) {
@@ -76,27 +68,56 @@ export async function POST(req: NextRequest) {
   }
   const imgBuffer = await imgRes.arrayBuffer();
   const base64 = Buffer.from(imgBuffer).toString("base64");
-  const mediaType = (imgRes.headers.get("content-type") ?? "image/jpeg")
-    .split(";")[0]
-    .trim();
+  const mediaType = imgRes.headers.get("content-type")?.split(";")[0].trim() ?? "image/jpeg";
 
-  // Build detection prompt
-  const ruleList = rules.map((r, i) => `${i + 1}. **${r.label}**: ${r.description}`).join("\n");
-  const prompt = `You are an anti-cheat analyst reviewing a screenshot from the online game Soldier Front (SF Alpha).
+  // Build message content
+  const content: ContentBlock[] = [];
 
-Examine this screenshot carefully and check for the following cheat indicators:
+  // Include sample images as positive examples
+  if (samples.length > 0) {
+    content.push({
+      type: "text",
+      text: `You are an anti-cheat analyst for the online FPS game Soldier Front (SF Alpha).\n\nHere are ${samples.length} confirmed example screenshot(s) of players caught cheating:`,
+    });
+    for (const s of samples) {
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: s.mediaType, data: s.data },
+      });
+      content.push({ type: "text", text: `(Sample: "${s.label}")` });
+    }
+    content.push({ type: "text", text: "\nNow analyze the following new screenshot:" });
+  } else {
+    content.push({
+      type: "text",
+      text: "You are an anti-cheat analyst for the online FPS game Soldier Front (SF Alpha).\n\nAnalyze the following screenshot:",
+    });
+  }
 
-${ruleList}
+  content.push({
+    type: "image",
+    source: { type: "base64", media_type: mediaType, data: base64 },
+  });
 
-Respond with a JSON object in this exact format:
+  // Build rule list
+  const ruleSection = rules.length > 0
+    ? `\nCheck specifically for these cheat indicators:\n${rules.map((r, i) => `${i + 1}. **${r.label}**: ${r.description}`).join("\n")}`
+    : "";
+
+  content.push({
+    type: "text",
+    text: `${ruleSection}
+
+Respond with ONLY a JSON object in this exact format, no markdown:
 {
   "flagged": true or false,
-  "rules_triggered": ["Rule Label 1", "Rule Label 2"],
-  "verdict": "Short 1-2 sentence summary of your findings.",
-  "details": "More detailed explanation of what you observed in the screenshot."
+  "rules_triggered": ["Rule Label 1"],
+  "verdict": "One or two sentence summary.",
+  "details": "Detailed explanation of what you see."
 }
 
-Only flag if you are reasonably confident. If nothing suspicious is found, set flagged to false and rules_triggered to [].`;
+Only flag if you are reasonably confident cheating is visible. If nothing suspicious, set flagged to false and rules_triggered to [].`,
+  });
 
   let claudeResult: {
     flagged: boolean;
@@ -106,16 +127,17 @@ Only flag if you are reasonably confident. If nothing suspicious is found, set f
   };
 
   try {
-    const text = await callClaude(base64, mediaType, prompt);
+    const text = await callClaude(content);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Claude returned no parseable JSON.");
     claudeResult = JSON.parse(jsonMatch[0]);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Analysis failed.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Analysis failed." },
+      { status: 500 },
+    );
   }
 
-  // Save to flagged list if suspicious
   if (claudeResult.flagged) {
     await addFlagged({
       id: unique_id,
