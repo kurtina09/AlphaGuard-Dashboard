@@ -29,6 +29,7 @@ export default function WatchlistView() {
   const [listError, setListError] = useState<string | null>(null);
 
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
 
   async function loadList() {
     setListLoading(true);
@@ -47,10 +48,23 @@ export default function WatchlistView() {
 
   useEffect(() => { loadList(); }, []);
 
+  // Check for duplicate GUID as the user types
+  const isDuplicate =
+    playerGuid.trim().length === 36 &&
+    entries.some(
+      (e) => e.player_guid.toLowerCase() === playerGuid.trim().toLowerCase(),
+    );
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(false);
+
+    if (isDuplicate) {
+      setFormError("This player GUID is already on the watch list.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/watchlist", {
@@ -85,6 +99,17 @@ export default function WatchlistView() {
     }
   }
 
+  // Filter entries by search query (GUID or reason)
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? entries.filter(
+        (e) =>
+          e.player_guid.toLowerCase().includes(q) ||
+          e.reason.toLowerCase().includes(q) ||
+          e.added_by.toLowerCase().includes(q),
+      )
+    : entries;
+
   return (
     <div className="space-y-6">
       {/* Add form */}
@@ -101,18 +126,34 @@ export default function WatchlistView() {
           <input
             type="text"
             value={playerGuid}
-            onChange={(e) => { setPlayerGuid(e.target.value); setFormError(null); setFormSuccess(false); }}
+            onChange={(e) => {
+              setPlayerGuid(e.target.value);
+              setFormError(null);
+              setFormSuccess(false);
+            }}
             placeholder="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
             required
-            className="w-full px-3 py-2 bg-[var(--panel-2)] border rounded-md text-sm font-mono outline-none focus:border-[var(--accent)]"
+            className={`w-full px-3 py-2 bg-[var(--panel-2)] border rounded-md text-sm font-mono outline-none focus:border-[var(--accent)] transition-colors ${
+              isDuplicate ? "border-yellow-500/70" : ""
+            }`}
           />
+          {isDuplicate && (
+            <p className="text-xs text-yellow-400 flex items-center gap-1.5 mt-1">
+              <span>⚠</span>
+              This player is already on the watch list.
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
           <label className="block text-sm font-medium">Reason</label>
           <textarea
             value={reason}
-            onChange={(e) => { setReason(e.target.value); setFormError(null); setFormSuccess(false); }}
+            onChange={(e) => {
+              setReason(e.target.value);
+              setFormError(null);
+              setFormSuccess(false);
+            }}
             placeholder="Why is this player being watched?"
             rows={3}
             required
@@ -133,7 +174,7 @@ export default function WatchlistView() {
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || isDuplicate}
           className="w-full py-2 rounded-md bg-[var(--accent)] text-white font-medium hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {submitting ? "Adding…" : "Add to Watch List"}
@@ -142,17 +183,27 @@ export default function WatchlistView() {
 
       {/* List */}
       <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h2 className="text-sm font-semibold">
+        <div className="flex items-center justify-between px-4 py-3 border-b gap-3">
+          <h2 className="text-sm font-semibold shrink-0">
             Watch List
             {entries.length > 0 && (
-              <span className="ml-2 text-xs text-[var(--text-dim)]">({entries.length})</span>
+              <span className="ml-2 text-xs text-[var(--text-dim)]">
+                ({q && filtered.length !== entries.length ? `${filtered.length} of ` : ""}{entries.length})
+              </span>
             )}
           </h2>
+          {/* Search bar */}
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by GUID, reason, or admin…"
+            className="flex-1 max-w-sm px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-xs outline-none focus:border-[var(--accent)]"
+          />
           <button
             onClick={loadList}
             disabled={listLoading}
-            className="text-xs px-3 py-1 rounded-md border text-[var(--text-dim)] hover:text-white disabled:opacity-40"
+            className="shrink-0 text-xs px-3 py-1 rounded-md border text-[var(--text-dim)] hover:text-white disabled:opacity-40"
           >
             {listLoading ? "Loading…" : "Refresh"}
           </button>
@@ -167,7 +218,12 @@ export default function WatchlistView() {
         {!listLoading && !listError && entries.length === 0 && (
           <p className="px-4 py-8 text-center text-sm text-[var(--text-dim)]">No players on the watch list.</p>
         )}
-        {!listLoading && entries.length > 0 && (
+        {!listLoading && !listError && entries.length > 0 && filtered.length === 0 && (
+          <p className="px-4 py-8 text-center text-sm text-[var(--text-dim)]">
+            No entries match &ldquo;{search}&rdquo;.
+          </p>
+        )}
+        {!listLoading && filtered.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-[var(--panel-2)] text-left text-[var(--text-dim)]">
@@ -180,7 +236,7 @@ export default function WatchlistView() {
                 </tr>
               </thead>
               <tbody>
-                {entries.map((e) => (
+                {filtered.map((e) => (
                   <tr key={e.id} className="border-t hover:bg-[var(--panel-2)]/50">
                     <td className="px-4 py-2.5 font-mono text-xs text-[var(--text-dim)]">
                       {e.player_guid}

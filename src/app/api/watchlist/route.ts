@@ -39,6 +39,18 @@ export async function POST(req: Request) {
 
   try {
     const items = await readWatchlist();
+
+    // Duplicate check
+    const exists = items.some(
+      (e) => e.player_guid.toLowerCase() === player_guid.toLowerCase(),
+    );
+    if (exists) {
+      return NextResponse.json(
+        { error: "This player GUID is already on the watch list." },
+        { status: 409 },
+      );
+    }
+
     const entry: WatchlistEntry = {
       id: Date.now(),
       player_guid,
