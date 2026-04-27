@@ -35,7 +35,7 @@ function fmtDate(s: string) {
   if (!s) return "";
   const d = new Date(s);
   if (isNaN(d.getTime())) return s;
-  return d.toLocaleString();
+  return d.toLocaleString("en-PH", { timeZone: "Asia/Manila" });
 }
 
 function Pagination({
