@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 type Entry = {
   id: number;
   player_guid: string;
+  codename?: string;
   reason: string;
   added_by: string;
   added_at: string;
@@ -19,6 +20,7 @@ function fmtDate(s: string) {
 
 export default function WatchlistView() {
   const [playerGuid, setPlayerGuid] = useState("");
+  const [codename, setCodename] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -70,12 +72,13 @@ export default function WatchlistView() {
       const res = await fetch("/api/watchlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player_guid: playerGuid.trim(), reason: reason.trim() }),
+        body: JSON.stringify({ player_guid: playerGuid.trim(), codename: codename.trim(), reason: reason.trim() }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
       setFormSuccess(true);
       setPlayerGuid("");
+      setCodename("");
       setReason("");
       loadList();
     } catch (err) {
@@ -105,6 +108,7 @@ export default function WatchlistView() {
     ? entries.filter(
         (e) =>
           e.player_guid.toLowerCase().includes(q) ||
+          (e.codename ?? "").toLowerCase().includes(q) ||
           e.reason.toLowerCase().includes(q) ||
           e.added_by.toLowerCase().includes(q),
       )
@@ -143,6 +147,19 @@ export default function WatchlistView() {
               This player is already on the watch list.
             </p>
           )}
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium">
+            Codename <span className="text-[var(--text-dim)] font-normal">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={codename}
+            onChange={(e) => { setCodename(e.target.value); setFormError(null); setFormSuccess(false); }}
+            placeholder="Player's in-game name"
+            className="w-full px-3 py-2 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
+          />
         </div>
 
         <div className="space-y-1.5">
@@ -229,6 +246,7 @@ export default function WatchlistView() {
               <thead className="bg-[var(--panel-2)] text-left text-[var(--text-dim)]">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Player GUID</th>
+                  <th className="px-4 py-2.5 font-medium">Codename</th>
                   <th className="px-4 py-2.5 font-medium">Reason</th>
                   <th className="px-4 py-2.5 font-medium">Added By</th>
                   <th className="px-4 py-2.5 font-medium">Date</th>
@@ -240,6 +258,9 @@ export default function WatchlistView() {
                   <tr key={e.id} className="border-t hover:bg-[var(--panel-2)]/50">
                     <td className="px-4 py-2.5 font-mono text-xs text-[var(--text-dim)]">
                       {e.player_guid}
+                    </td>
+                    <td className="px-4 py-2.5 text-sm">
+                      {e.codename || <span className="text-[var(--text-dim)]">—</span>}
                     </td>
                     <td className="px-4 py-2.5 max-w-sm">
                       <div className="truncate" title={e.reason}>{e.reason}</div>
