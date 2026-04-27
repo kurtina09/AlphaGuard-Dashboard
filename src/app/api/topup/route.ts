@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/session";
-import { acFetch } from "@/lib/ac-token";
+import { topupFetch } from "@/lib/topup-token";
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   let res: Response;
   try {
-    res = await acFetch("/payment/topup", {
+    res = await topupFetch("/payment/topup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
