@@ -4,6 +4,7 @@ import path from "path";
 export type WatchlistEntry = {
   id: number;
   player_guid: string;
+  codename?: string;
   reason: string;
   added_by: string;
   added_at: string;

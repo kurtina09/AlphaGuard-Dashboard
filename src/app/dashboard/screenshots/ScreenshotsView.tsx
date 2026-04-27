@@ -169,11 +169,14 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function StatCell({ label, value }: { label: string; value: string | number }) {
+function StatCell({ label, value, copyValue }: { label: string; value: string | number; copyValue?: string }) {
   return (
     <div className="bg-[var(--panel-2)] rounded-md px-3 py-2">
       <div className="text-xs text-[var(--text-dim)] mb-0.5">{label}</div>
-      <div className="font-medium text-sm">{value}</div>
+      <div className="flex items-center gap-1.5">
+        <div className="font-medium text-sm flex-1">{value}</div>
+        {copyValue && <CopyButton text={copyValue} />}
+      </div>
     </div>
   );
 }
@@ -497,7 +500,7 @@ export default function ScreenshotsView() {
 
               {playerInfo && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <StatCell label="Codename" value={playerInfo.codename ?? "—"} />
+                  <StatCell label="Codename" value={playerInfo.codename ?? "—"} copyValue={playerInfo.codename ?? undefined} />
                   <StatCell label="Rank" value={playerInfo.rank_num != null ? String(playerInfo.rank_num) : "—"} />
                   <StatCell label="Kills" value={playerInfo.kills != null ? String(playerInfo.kills) : "—"} />
                   <StatCell label="KDR" value={playerInfo.kill_death_ratio != null ? playerInfo.kill_death_ratio.toFixed(2) : "—"} />

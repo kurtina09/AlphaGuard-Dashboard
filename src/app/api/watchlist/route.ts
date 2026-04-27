@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { player_guid, reason } = body as { player_guid?: string; reason?: string };
+  const { player_guid, codename, reason } = body as { player_guid?: string; codename?: string; reason?: string };
 
   if (!player_guid || !/^[0-9a-f-]{36}$/i.test(player_guid)) {
     return NextResponse.json({ error: "Invalid or missing player_guid." }, { status: 400 });
@@ -54,6 +54,7 @@ export async function POST(req: Request) {
     const entry: WatchlistEntry = {
       id: Date.now(),
       player_guid,
+      ...(codename?.trim() ? { codename: codename.trim() } : {}),
       reason: reason.trim(),
       added_by: session.codename || session.username || "admin",
       added_at: new Date().toISOString(),
