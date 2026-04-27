@@ -15,7 +15,6 @@ export default function Nav({
 
   const links = [
     { href: "/dashboard/screenshots", label: "Screenshots" },
-    { href: "/dashboard/cheat-detection", label: "Cheat Detection" },
     { href: "/dashboard/ban", label: "Ban / Kick" },
     { href: "/dashboard/detections", label: "Detections" },
     { href: "/dashboard/live-matches", label: "Search Matches" },
