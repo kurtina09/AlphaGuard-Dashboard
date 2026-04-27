@@ -19,7 +19,9 @@ export default function Nav({
     { href: "/dashboard/detections", label: "Detections" },
     { href: "/dashboard/live-matches", label: "Search Matches" },
     { href: "/dashboard/watchlist", label: "Watch List" },
+    { href: "/dashboard/banned-ticket", label: "Banned — Waiting Ticket" },
     { href: "/dashboard/topup", label: "Top-Up" },
+    { href: "/dashboard/upload", label: "Upload to R2" },
   ];
 
   async function logout() {
