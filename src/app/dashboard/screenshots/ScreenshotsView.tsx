@@ -301,7 +301,7 @@ export default function ScreenshotsView() {
 
   return (
     <>
-      <div className="sticky top-0 z-20 -mx-8 px-8 pt-3 pb-3 border-b border-[var(--panel)] shadow-[0_4px_16px_rgba(0,0,0,0.6)]" style={{ backgroundColor: "var(--bg)" }}>
+      <div className="sticky top-0 z-50 -mx-8 px-8 pt-3 pb-4 border-b border-[var(--panel)]" style={{ backgroundColor: "#0b0d12", boxShadow: "0 4px 24px 8px #0b0d12" }}>
       <form
         onSubmit={applyFilter}
         className="flex flex-wrap gap-3 items-end mb-3 bg-[var(--panel)] border rounded-lg p-4"
