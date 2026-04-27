@@ -22,7 +22,7 @@ async function callClaude(content: ContentBlock[]): Promise<string> {
     },
     body: JSON.stringify({
       model: "claude-opus-4-5",
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [{ role: "user", content }],
     }),
   });
@@ -53,13 +53,6 @@ export async function POST(req: NextRequest) {
   const [allRules, samples] = await Promise.all([readRules(), readSamples()]);
   const rules = allRules.filter((r) => r.enabled);
 
-  if (rules.length === 0 && samples.length === 0) {
-    return NextResponse.json(
-      { error: "No detection rules or samples configured. Set them up on the Cheat Detection page." },
-      { status: 400 },
-    );
-  }
-
   // Fetch screenshot image
   const origin = req.nextUrl.origin;
   const imgRes = await fetch(`${origin}/api/screenshots/${unique_id}`, { cache: "no-store" });
@@ -73,24 +66,39 @@ export async function POST(req: NextRequest) {
   // Build message content
   const content: ContentBlock[] = [];
 
+  const intro = `You are an expert anti-cheat analyst for Soldier Front (SF Alpha), a tactical online FPS game.
+
+Your job is to identify ANY visual evidence of cheating. You should flag screenshots even when evidence is subtle or uncertain — it is far better to flag for human review than to miss a cheater.
+
+ALWAYS scan for these universal FPS cheat indicators regardless of what else you are told:
+
+1. **ESP / Wallhack overlays** — colored boxes, rectangles, outlines, or highlights drawn around players or enemies, especially visible THROUGH walls, floors, or terrain. Also: player names, health bars, distance numbers, or item markers shown through solid surfaces that the normal game UI would not show.
+2. **Aimbot signs** — crosshair or reticle perfectly locked onto an enemy's head when the player's viewpoint would not naturally aim there; suspiciously perfect headshot angles.
+3. **Non-standard HUD elements** — any overlay, colored marker, or UI widget that does not belong to the normal Soldier Front game interface. Unusual colored outlines or glows on player models.
+4. **Impossible positioning or clipping** — a player or their weapon clipping through geometry, standing inside a wall, or in a physically unreachable location.
+5. **No-recoil / no-spread patterns** — bullet spray that is impossibly tight or a weapon that shows no movement between shots at long range.
+6. **Speed hacks** — motion blur artifacts or player positions that suggest movement far faster than normal.
+
+If you see ANY of the above, or anything else that looks out of place for a normal gameplay screenshot, set flagged to true.`;
+
   // Include sample images as positive examples
   if (samples.length > 0) {
     content.push({
       type: "text",
-      text: `You are an anti-cheat analyst for the online FPS game Soldier Front (SF Alpha).\n\nHere are ${samples.length} confirmed example screenshot(s) of players caught cheating:`,
+      text: `${intro}\n\nHere are ${samples.length} confirmed example screenshot(s) of players caught cheating in this game. Study these carefully — the same types of visual artifacts may appear in the screenshot you are about to analyze:`,
     });
     for (const s of samples) {
       content.push({
         type: "image",
         source: { type: "base64", media_type: s.mediaType, data: s.data },
       });
-      content.push({ type: "text", text: `(Sample: "${s.label}")` });
+      content.push({ type: "text", text: `(Confirmed cheat sample: "${s.label}")` });
     }
     content.push({ type: "text", text: "\nNow analyze the following new screenshot:" });
   } else {
     content.push({
       type: "text",
-      text: "You are an anti-cheat analyst for the online FPS game Soldier Front (SF Alpha).\n\nAnalyze the following screenshot:",
+      text: `${intro}\n\nAnalyze the following screenshot:`,
     });
   }
 
@@ -101,22 +109,24 @@ export async function POST(req: NextRequest) {
 
   // Build rule list
   const ruleSection = rules.length > 0
-    ? `\nCheck specifically for these cheat indicators:\n${rules.map((r, i) => `${i + 1}. **${r.label}**: ${r.description}`).join("\n")}`
+    ? `\nIn addition to the universal indicators above, also check specifically for these admin-defined cheat indicators:\n${rules.map((r, i) => `${i + 1}. **${r.label}**: ${r.description}`).join("\n")}`
     : "";
 
   content.push({
     type: "text",
     text: `${ruleSection}
 
-Respond with ONLY a JSON object in this exact format, no markdown:
+IMPORTANT: Your goal is to help human reviewers — they will make the final call. Flag anything that looks suspicious, unusual, or that you cannot explain as normal gameplay. Do NOT require certainty to flag.
+
+Respond with ONLY a JSON object in this exact format, no markdown, no code fences:
 {
   "flagged": true or false,
-  "rules_triggered": ["Rule Label 1"],
-  "verdict": "One or two sentence summary.",
-  "details": "Detailed explanation of what you see."
+  "rules_triggered": ["Rule Label 1", "Rule Label 2"],
+  "verdict": "One or two sentence summary of what you found.",
+  "details": "Detailed description of every suspicious element you can see, or why the screenshot looks clean."
 }
 
-Only flag if you are reasonably confident cheating is visible. If nothing suspicious, set flagged to false and rules_triggered to [].`,
+If the screenshot looks completely clean and normal with no suspicious overlays, artifacts, or anomalies, set flagged to false. Otherwise set flagged to true.`,
   });
 
   let claudeResult: {
