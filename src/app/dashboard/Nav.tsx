@@ -19,6 +19,7 @@ export default function Nav({
     { href: "/dashboard/detections", label: "Detections" },
     { href: "/dashboard/live-matches", label: "Search Matches" },
     { href: "/dashboard/watchlist", label: "Watch List" },
+    { href: "/dashboard/topup", label: "Top-Up" },
   ];
 
   async function logout() {
