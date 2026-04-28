@@ -63,6 +63,7 @@ export default function DetectionsView() {
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("date_added");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [reasonFilter, setReasonFilter] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,6 +102,7 @@ export default function DetectionsView() {
     setSearch("");
     setFrom("");
     setTo("");
+    setReasonFilter("");
     setPage(0);
   }
 
@@ -114,7 +116,10 @@ export default function DetectionsView() {
   }
 
   const sortedItems = useMemo(() => {
-    const items = data?.items ?? [];
+    const needle = reasonFilter.toLowerCase().trim();
+    const items = (data?.items ?? []).filter((d) =>
+      needle ? (d.reason ?? "").toLowerCase().includes(needle) : true
+    );
     return [...items].sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
@@ -136,7 +141,7 @@ export default function DetectionsView() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [data, sortKey, sortDir]);
+  }, [data, sortKey, sortDir, reasonFilter]);
 
   const totalPages = data?.total_pages ?? 0;
 
@@ -153,6 +158,16 @@ export default function DetectionsView() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="e.g. Sniper99"
+            className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
+          />
+        </div>
+        <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+          <label className="text-xs text-[var(--text-dim)]">Search reason</label>
+          <input
+            type="text"
+            value={reasonFilter}
+            onChange={(e) => setReasonFilter(e.target.value)}
+            placeholder="e.g. aimbot, wallhack…"
             className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
           />
         </div>
@@ -258,10 +273,10 @@ export default function DetectionsView() {
                   </td>
                 </tr>
               )}
-              {!loading && !error && data && data.items.length === 0 && (
+              {!loading && !error && data && sortedItems.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-[var(--text-dim)]">
-                    No detections found.
+                    {reasonFilter ? `No detections match "${reasonFilter}".` : "No detections found."}
                   </td>
                 </tr>
               )}
@@ -311,7 +326,9 @@ export default function DetectionsView() {
       <div className="flex items-center justify-between mt-4 text-sm text-[var(--text-dim)]">
         <div>
           {data
-            ? `Page ${data.page + 1} of ${Math.max(1, totalPages)} · ${data.total_count} total`
+            ? reasonFilter
+              ? `${sortedItems.length} of ${data.items.length} on this page match · ${data.total_count} total`
+              : `Page ${data.page + 1} of ${Math.max(1, totalPages)} · ${data.total_count} total`
             : ""}
         </div>
         <div className="flex gap-2">
