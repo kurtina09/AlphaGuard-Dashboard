@@ -185,6 +185,10 @@ export default function ScreenshotsView() {
   const [page, setPage] = useState(0);
   const [guidInput, setGuidInput] = useState("");
   const [guid, setGuid] = useState("");
+  const [fromInput, setFromInput] = useState("");
+  const [toInput, setToInput] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [data, setData] = useState<PageResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,6 +206,8 @@ export default function ScreenshotsView() {
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
     if (guid) qs.set("player_guid", guid);
+    if (from) qs.set("from", new Date(from).toISOString());
+    if (to)   qs.set("to",   new Date(to).toISOString());
     try {
       const res = await fetch(`/api/screenshots?${qs.toString()}`);
       const body = await res.json();
@@ -212,7 +218,7 @@ export default function ScreenshotsView() {
     } finally {
       setLoading(false);
     }
-  }, [page, guid]);
+  }, [page, guid, from, to]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -284,11 +290,17 @@ export default function ScreenshotsView() {
     e.preventDefault();
     setPage(0);
     setGuid(guidInput.trim());
+    setFrom(fromInput);
+    setTo(toInput);
   }
 
   function reset() {
     setGuidInput("");
     setGuid("");
+    setFromInput("");
+    setToInput("");
+    setFrom("");
+    setTo("");
     setPage(0);
   }
 
@@ -306,13 +318,31 @@ export default function ScreenshotsView() {
         onSubmit={applyFilter}
         className="flex flex-wrap gap-3 items-end mb-3 bg-[var(--panel)] border rounded-lg p-4"
       >
-        <div className="flex flex-col gap-1 flex-1 min-w-[280px]">
+        <div className="flex flex-col gap-1 flex-1 min-w-[240px]">
           <label className="text-xs text-[var(--text-dim)]">Player GUID</label>
           <input
             type="text"
             value={guidInput}
             onChange={(e) => setGuidInput(e.target.value)}
             placeholder="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[var(--text-dim)]">From</label>
+          <input
+            type="datetime-local"
+            value={fromInput}
+            onChange={(e) => setFromInput(e.target.value)}
+            className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[var(--text-dim)]">To</label>
+          <input
+            type="datetime-local"
+            value={toInput}
+            onChange={(e) => setToInput(e.target.value)}
             className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
           />
         </div>

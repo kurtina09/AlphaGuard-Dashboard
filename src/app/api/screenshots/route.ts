@@ -22,18 +22,24 @@ export async function GET(req: Request) {
     Math.max(1, Number(url.searchParams.get("size") || 24)),
   );
   const playerGuid = url.searchParams.get("player_guid")?.trim() || "";
+  const fromRaw = url.searchParams.get("from")?.trim() || "";
+  const toRaw = url.searchParams.get("to")?.trim() || "";
 
   const table = screenshotTable();
   const offset = page * size;
 
   try {
     const pool = getPool();
-    const filterSql = playerGuid ? `WHERE player_guid = ?` : "";
+
+    const conditions: string[] = [];
     const params: (string | number)[] = [];
-    if (playerGuid) params.push(playerGuid);
+    if (playerGuid) { conditions.push("player_guid = ?"); params.push(playerGuid); }
+    if (fromRaw)    { conditions.push("`time` >= ?");     params.push(new Date(fromRaw).toISOString()); }
+    if (toRaw)      { conditions.push("`time` <= ?");     params.push(new Date(toRaw).toISOString()); }
+    const whereSql = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const [countRows] = await pool.query<RowDataPacket[]>(
-      `SELECT COUNT(*) AS c FROM \`${table}\` ${filterSql}`,
+      `SELECT COUNT(*) AS c FROM \`${table}\` ${whereSql}`,
       params,
     );
     const totalCount = Number((countRows[0] as { c: number }).c || 0);
@@ -41,7 +47,7 @@ export async function GET(req: Request) {
     const [rows] = await pool.query<Row[]>(
       `SELECT unique_id, player_guid, \`time\`
          FROM \`${table}\`
-         ${filterSql}
+         ${whereSql}
          ORDER BY \`time\` DESC
          LIMIT ? OFFSET ?`,
       [...params, size, offset],
