@@ -116,10 +116,12 @@ export default function DetectionsView() {
   }
 
   const sortedItems = useMemo(() => {
-    const needle = reasonFilter.toLowerCase().trim();
-    const items = (data?.items ?? []).filter((d) =>
-      needle ? (d.reason ?? "").toLowerCase().includes(needle) : true
-    );
+    const words = reasonFilter.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const items = (data?.items ?? []).filter((d) => {
+      if (words.length === 0) return true;
+      const haystack = (d.reason ?? "").toLowerCase();
+      return words.every((w) => haystack.includes(w));
+    });
     return [...items].sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
