@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 type MatchItem = {
   assists: number;
   blue_wins: number;
-  date_added: string;
+  date_added: string | number;
   deaths: number;
   experience: number;
   headshots: number;
@@ -35,19 +35,30 @@ type MatchesResponse = {
 };
 
 /* ── Helpers ────────────────────────────────────────────── */
-function formatDate(iso: string) {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
+function formatDate(raw: string | number | undefined | null) {
+  if (raw == null || raw === "") return "—";
+  let ms: number;
+  if (typeof raw === "number") {
+    // Unix seconds if the value is plausibly < year 3000 in seconds
+    ms = raw < 9_999_999_999 ? raw * 1000 : raw;
+  } else {
+    const n = Number(raw);
+    if (!isNaN(n) && String(raw).trim() === String(n)) {
+      // Numeric string — same seconds/ms heuristic
+      ms = n < 9_999_999_999 ? n * 1000 : n;
+    } else {
+      ms = new Date(raw).getTime();
+    }
   }
+  if (isNaN(ms)) return String(raw);
+  return new Date(ms).toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function formatDuration(raw: string | number) {
@@ -192,6 +203,7 @@ export default function LiveMatchesView() {
       if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
       setData(body as MatchesResponse);
       setSearchedGuid(guid);
+      if (body.items?.[0]) console.log("[SearchMatches] first item:", body.items[0]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
       setData(null);
