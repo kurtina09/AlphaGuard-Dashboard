@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Detection = {
   guid: string;
@@ -27,6 +27,9 @@ type PageResponse = {
   last: boolean;
 };
 
+type SortKey = "date_added" | "codename" | "reason" | "action" | "status";
+type SortDir = "asc" | "desc";
+
 const PAGE_SIZE = 20;
 
 function fmtDate(s: string) {
@@ -34,6 +37,19 @@ function fmtDate(s: string) {
   const d = new Date(s);
   if (isNaN(d.getTime())) return s;
   return d.toLocaleString();
+}
+
+function actionRank(d: Detection) {
+  if (d.ban) return 2;
+  if (d.kick) return 1;
+  return 0;
+}
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (col !== sortKey) {
+    return <span className="ml-1 opacity-25 text-[10px]">⇅</span>;
+  }
+  return <span className="ml-1 text-[10px] text-white">{sortDir === "asc" ? "▲" : "▼"}</span>;
 }
 
 export default function DetectionsView() {
@@ -45,6 +61,8 @@ export default function DetectionsView() {
   const [data, setData] = useState<PageResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("date_added");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +103,40 @@ export default function DetectionsView() {
     setTo("");
     setPage(0);
   }
+
+  function toggleSort(col: SortKey) {
+    if (sortKey === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(col);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedItems = useMemo(() => {
+    const items = data?.items ?? [];
+    return [...items].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "date_added":
+          cmp = new Date(a.date_added).getTime() - new Date(b.date_added).getTime();
+          break;
+        case "codename":
+          cmp = (a.codename ?? "").localeCompare(b.codename ?? "");
+          break;
+        case "reason":
+          cmp = (a.reason ?? "").localeCompare(b.reason ?? "");
+          break;
+        case "action":
+          cmp = actionRank(a) - actionRank(b);
+          break;
+        case "status":
+          cmp = Number(a.is_banned) - Number(b.is_banned);
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [data, sortKey, sortDir]);
 
   const totalPages = data?.total_pages ?? 0;
 
@@ -164,12 +216,31 @@ export default function DetectionsView() {
           <table className="w-full text-sm">
             <thead className="bg-[var(--panel-2)] text-left text-[var(--text-dim)]">
               <tr>
-                <th className="px-4 py-2.5 font-medium">Date</th>
-                <th className="px-4 py-2.5 font-medium">Codename</th>
-                <th className="px-4 py-2.5 font-medium">Player GUID</th>
-                <th className="px-4 py-2.5 font-medium">Reason</th>
-                <th className="px-4 py-2.5 font-medium">Action</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
+                {(
+                  [
+                    { key: "date_added", label: "Date" },
+                    { key: "codename",   label: "Codename" },
+                    { key: null,         label: "Player GUID" },
+                    { key: "reason",     label: "Reason" },
+                    { key: "action",     label: "Action" },
+                    { key: "status",     label: "Status" },
+                  ] as { key: SortKey | null; label: string }[]
+                ).map(({ key, label }) =>
+                  key ? (
+                    <th
+                      key={key}
+                      onClick={() => toggleSort(key)}
+                      className="px-4 py-2.5 font-medium cursor-pointer select-none hover:text-white transition-colors"
+                    >
+                      {label}
+                      <SortIcon col={key} sortKey={sortKey} sortDir={sortDir} />
+                    </th>
+                  ) : (
+                    <th key={label} className="px-4 py-2.5 font-medium">
+                      {label}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody>
@@ -196,7 +267,7 @@ export default function DetectionsView() {
               )}
               {!loading &&
                 !error &&
-                data?.items.map((d) => (
+                sortedItems.map((d) => (
                   <tr key={d.guid} className="border-t hover:bg-[var(--panel-2)]/50">
                     <td className="px-4 py-2.5 whitespace-nowrap text-[var(--text-dim)]">
                       {fmtDate(d.date_added)}
