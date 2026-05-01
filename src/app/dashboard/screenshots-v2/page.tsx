@@ -9,7 +9,7 @@ export default function ScreenshotsV2Page() {
           Screenshots pulled from the <code className="text-xs bg-[var(--panel-2)] px-1 py-0.5 rounded">screenshots_v2</code> table.
         </p>
       </header>
-      <ScreenshotsView table="screenshots_v2" />
+      <ScreenshotsView table="screenshots_v2" showNotes />
     </div>
   );
 }

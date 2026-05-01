@@ -6,6 +6,7 @@ type Item = {
   unique_id: string;
   player_guid: string;
   time: string;
+  notes?: string | null;
 };
 
 type PageResponse = {
@@ -181,7 +182,7 @@ function StatCell({ label, value, copyValue }: { label: string; value: string | 
   );
 }
 
-export default function ScreenshotsView({ table = "" }: { table?: string }) {
+export default function ScreenshotsView({ table = "", showNotes = false }: { table?: string; showNotes?: boolean }) {
   const [page, setPage] = useState(0);
   const [guidInput, setGuidInput] = useState("");
   const [guid, setGuid] = useState("");
@@ -205,10 +206,11 @@ export default function ScreenshotsView({ table = "" }: { table?: string }) {
     setLoading(true);
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
-    if (guid)  qs.set("player_guid", guid);
-    if (from)  qs.set("from", new Date(from).toISOString());
-    if (to)    qs.set("to",   new Date(to).toISOString());
-    if (table) qs.set("table", table);
+    if (guid)      qs.set("player_guid", guid);
+    if (from)      qs.set("from", new Date(from).toISOString());
+    if (to)        qs.set("to",   new Date(to).toISOString());
+    if (table)     qs.set("table", table);
+    if (showNotes) qs.set("notes", "1");
     try {
       const res = await fetch(`/api/screenshots?${qs.toString()}`);
       const body = await res.json();
@@ -418,6 +420,11 @@ export default function ScreenshotsView({ table = "" }: { table?: string }) {
                   <CopyButton text={it.player_guid} />
                 </div>
                 <div className="text-[var(--text-dim)] text-xs mt-0.5">{fmtDate(it.time)}</div>
+                {showNotes && it.notes && (
+                  <div className="mt-1 text-xs text-yellow-300/80 line-clamp-2" title={it.notes}>
+                    {it.notes}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -443,6 +450,9 @@ export default function ScreenshotsView({ table = "" }: { table?: string }) {
                   <CopyButton text={lightbox.player_guid} />
                 </div>
                 <div className="text-[var(--text-dim)] text-xs mt-0.5">{fmtDate(lightbox.time)}</div>
+                {showNotes && lightbox.notes && (
+                  <div className="mt-1 text-xs text-yellow-300/80 max-w-md">{lightbox.notes}</div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 border rounded-md overflow-hidden text-xs">
