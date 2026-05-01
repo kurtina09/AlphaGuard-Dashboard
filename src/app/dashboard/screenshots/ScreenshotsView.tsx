@@ -181,7 +181,7 @@ function StatCell({ label, value, copyValue }: { label: string; value: string | 
   );
 }
 
-export default function ScreenshotsView() {
+export default function ScreenshotsView({ table = "" }: { table?: string }) {
   const [page, setPage] = useState(0);
   const [guidInput, setGuidInput] = useState("");
   const [guid, setGuid] = useState("");
@@ -205,9 +205,10 @@ export default function ScreenshotsView() {
     setLoading(true);
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
-    if (guid) qs.set("player_guid", guid);
-    if (from) qs.set("from", new Date(from).toISOString());
-    if (to)   qs.set("to",   new Date(to).toISOString());
+    if (guid)  qs.set("player_guid", guid);
+    if (from)  qs.set("from", new Date(from).toISOString());
+    if (to)    qs.set("to",   new Date(to).toISOString());
+    if (table) qs.set("table", table);
     try {
       const res = await fetch(`/api/screenshots?${qs.toString()}`);
       const body = await res.json();
@@ -405,7 +406,7 @@ export default function ScreenshotsView() {
               <div className="aspect-video bg-black/40 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`/api/screenshots/${it.unique_id}`}
+                  src={`/api/screenshots/${it.unique_id}${table ? `?table=${table}` : ""}`}
                   alt={`screenshot ${it.unique_id}`}
                   loading="lazy"
                   className="w-full h-full object-cover group-hover:opacity-90"
@@ -487,7 +488,7 @@ export default function ScreenshotsView() {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`/api/screenshots/${lightbox.unique_id}`}
+                  src={`/api/screenshots/${lightbox.unique_id}${table ? `?table=${table}` : ""}`}
                   alt={`screenshot ${lightbox.unique_id}`}
                   onClick={() => setZoom(z => z >= 4 ? 1 : +(z + 0.5).toFixed(2))}
                   style={{
