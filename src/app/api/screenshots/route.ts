@@ -7,6 +7,7 @@ type Row = RowDataPacket & {
   unique_id: number | string;
   player_guid: string;
   time: Date | string;
+  notes?: string | null;
 };
 
 export async function GET(req: Request) {
@@ -25,6 +26,7 @@ export async function GET(req: Request) {
   const fromRaw = url.searchParams.get("from")?.trim() || "";
   const toRaw = url.searchParams.get("to")?.trim() || "";
   const tableParam = url.searchParams.get("table")?.trim() || "";
+  const withNotes = url.searchParams.get("notes") === "1";
 
   const table = (tableParam && /^[A-Za-z0-9_]+$/.test(tableParam))
     ? tableParam
@@ -47,8 +49,12 @@ export async function GET(req: Request) {
     );
     const totalCount = Number((countRows[0] as { c: number }).c || 0);
 
+    const selectCols = withNotes
+      ? "unique_id, player_guid, `time`, `notes`"
+      : "unique_id, player_guid, `time`";
+
     const [rows] = await pool.query<Row[]>(
-      `SELECT unique_id, player_guid, \`time\`
+      `SELECT ${selectCols}
          FROM \`${table}\`
          ${whereSql}
          ORDER BY \`time\` DESC
@@ -59,8 +65,8 @@ export async function GET(req: Request) {
     const items = rows.map((r) => ({
       unique_id: String(r.unique_id),
       player_guid: r.player_guid,
-      time:
-        r.time instanceof Date ? r.time.toISOString() : String(r.time || ""),
+      time: r.time instanceof Date ? r.time.toISOString() : String(r.time || ""),
+      ...(withNotes && { notes: r.notes ?? null }),
     }));
 
     const totalPages = Math.max(1, Math.ceil(totalCount / size));
