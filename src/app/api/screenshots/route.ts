@@ -24,15 +24,8 @@ export async function GET(req: Request) {
   const playerGuid = url.searchParams.get("player_guid")?.trim() || "";
   const fromRaw = url.searchParams.get("from")?.trim() || "";
   const toRaw = url.searchParams.get("to")?.trim() || "";
-  const tableParam = url.searchParams.get("table")?.trim() || "";
 
-  // Allow caller to override the default table; validate to alphanumeric/underscore only
-  let table: string;
-  if (tableParam && /^[A-Za-z0-9_]+$/.test(tableParam)) {
-    table = tableParam;
-  } else {
-    table = screenshotTable();
-  }
+  const table = screenshotTable();
   const offset = page * size;
 
   try {

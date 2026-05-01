@@ -189,8 +189,6 @@ export default function ScreenshotsView() {
   const [toInput, setToInput] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [table, setTable] = useState("");
-  const [tables, setTables] = useState<string[]>([]);
   const [data, setData] = useState<PageResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,24 +201,13 @@ export default function ScreenshotsView() {
   const [zoom, setZoom] = useState(1);
   const itemsRef = useRef<Item[]>([]);
 
-  // Load available tables once on mount
-  useEffect(() => {
-    fetch("/api/db-tables")
-      .then((r) => r.json())
-      .then((body: { tables?: string[]; error?: string }) => {
-        if (body.tables) setTables(body.tables);
-      })
-      .catch(() => {});
-  }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
-    if (guid)  qs.set("player_guid", guid);
-    if (from)  qs.set("from", new Date(from).toISOString());
-    if (to)    qs.set("to",   new Date(to).toISOString());
-    if (table) qs.set("table", table);
+    if (guid) qs.set("player_guid", guid);
+    if (from) qs.set("from", new Date(from).toISOString());
+    if (to)   qs.set("to",   new Date(to).toISOString());
     try {
       const res = await fetch(`/api/screenshots?${qs.toString()}`);
       const body = await res.json();
@@ -231,7 +218,7 @@ export default function ScreenshotsView() {
     } finally {
       setLoading(false);
     }
-  }, [page, guid, from, to, table]);
+  }, [page, guid, from, to]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -314,7 +301,6 @@ export default function ScreenshotsView() {
     setToInput("");
     setFrom("");
     setTo("");
-    setTable("");
     setPage(0);
   }
 
@@ -360,21 +346,6 @@ export default function ScreenshotsView() {
             className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
           />
         </div>
-        {tables.length > 0 && (
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-[var(--text-dim)]">Table</label>
-            <select
-              value={table}
-              onChange={(e) => { setTable(e.target.value); setPage(0); }}
-              className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
-            >
-              <option value="">Default (from server config)</option>
-              {tables.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-        )}
         <button type="submit" className="px-4 py-1.5 rounded-md bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)]">
           Filter
         </button>
