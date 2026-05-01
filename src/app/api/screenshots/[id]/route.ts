@@ -37,7 +37,7 @@ function sniffMime(buf: Buffer): string {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await getSession();
@@ -50,7 +50,10 @@ export async function GET(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const table = screenshotTable();
+  const tableParam = new URL(req.url).searchParams.get("table")?.trim() || "";
+  const table = (tableParam && /^[A-Za-z0-9_]+$/.test(tableParam))
+    ? tableParam
+    : screenshotTable();
   try {
     const pool = getPool();
     const [rows] = await pool.query<Row[]>(
