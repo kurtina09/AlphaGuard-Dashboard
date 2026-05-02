@@ -38,14 +38,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { type, hash, description } = await req.json() as {
+  const { id, type, hash, description } = await req.json() as {
+    id: number;
     type: string;
     hash: string;
     description?: string;
   };
 
-  if (!type || !hash) {
-    return NextResponse.json({ error: "type and hash are required." }, { status: 400 });
+  if (!id || !type || !hash) {
+    return NextResponse.json({ error: "id, type and hash are required." }, { status: 400 });
   }
 
   try {
@@ -60,12 +61,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "This HWID is already banned." }, { status: 409 });
     }
 
-    const [result] = await pool.query(
-      "INSERT INTO banned_hwid (type, hash, description, banned_date) VALUES (?, ?, ?, NOW())",
-      [type, hash, description ?? null],
-    ) as [{ insertId: number }, unknown];
+    await pool.query(
+      "INSERT INTO banned_hwid (id, type, hash, description, banned_date) VALUES (?, ?, ?, ?, NOW())",
+      [id, type, hash, description ?? null],
+    );
 
-    return NextResponse.json({ success: true, id: result.insertId });
+    return NextResponse.json({ success: true, id });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Database error" },

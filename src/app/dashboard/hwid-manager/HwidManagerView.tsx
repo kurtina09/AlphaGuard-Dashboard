@@ -335,6 +335,7 @@ export default function HwidManagerView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: confirmTarget.id,
           type: confirmTarget.type,
           hash: confirmTarget.hash,
           description: confirmTarget.description ?? undefined,
