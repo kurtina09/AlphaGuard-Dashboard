@@ -20,6 +20,8 @@ type BannedHwid = {
   hash: string;
   description: string | null;
   banned_date: string;
+  player_guid: string | null;
+  codename: string | null;
 };
 
 type HwidNote = {
@@ -173,6 +175,30 @@ function BannedRow({
 
   return (
     <tr className="border-t hover:bg-[var(--panel-2)]/50 align-top">
+      <td className="px-4 py-2.5 min-w-[140px]">
+        {b.codename ? (
+          <div>
+            <div className="text-sm font-medium text-white">{b.codename}</div>
+            {b.player_guid && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[120px]" title={b.player_guid}>
+                  {b.player_guid}
+                </span>
+                <CopyButton text={b.player_guid} />
+              </div>
+            )}
+          </div>
+        ) : b.player_guid ? (
+          <div className="flex items-center gap-1">
+            <span className="font-mono text-xs text-[var(--text-dim)] truncate max-w-[120px]" title={b.player_guid}>
+              {b.player_guid}
+            </span>
+            <CopyButton text={b.player_guid} />
+          </div>
+        ) : (
+          <span className="text-xs text-[var(--text-dim)]">—</span>
+        )}
+      </td>
       <td className="px-4 py-2.5">
         <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--panel-2)] border">
           {b.type}
@@ -395,6 +421,8 @@ export default function HwidManagerView() {
     const q = bannedSearch.toLowerCase();
     if (!q) return true;
     return (
+      (b.codename ?? "").toLowerCase().includes(q) ||
+      (b.player_guid ?? "").toLowerCase().includes(q) ||
       b.type.toLowerCase().includes(q) ||
       b.hash.toLowerCase().includes(q) ||
       (b.description ?? "").toLowerCase().includes(q)
@@ -635,7 +663,7 @@ export default function HwidManagerView() {
           type="text"
           value={bannedSearch}
           onChange={(e) => setBannedSearch(e.target.value)}
-          placeholder="Search by type, hash or description…"
+          placeholder="Search by codename, GUID, type, hash or description…"
           className="w-full mb-3 px-3 py-2 bg-[var(--panel)] border rounded-lg text-sm focus:outline-none focus:border-[var(--accent)]"
         />
 
@@ -655,6 +683,7 @@ export default function HwidManagerView() {
               <table className="w-full text-sm">
                 <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
                   <tr>
+                    <th className="px-4 py-2.5 text-left">Player</th>
                     <th className="px-4 py-2.5 text-left">Type</th>
                     <th className="px-4 py-2.5 text-left">Hash</th>
                     <th className="px-4 py-2.5 text-left">Description</th>
