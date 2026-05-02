@@ -2,6 +2,40 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+type NavLink = { href: string; label: string };
+type Section = { id: string; title: string; links: NavLink[] };
+
+const SECTIONS: Section[] = [
+  {
+    id: "screenshots",
+    title: "Screenshots",
+    links: [
+      { href: "/dashboard/screenshots",    label: "Screenshots v1 (Inactive)" },
+      { href: "/dashboard/screenshots-v2", label: "Screenshots v2" },
+      { href: "/dashboard/live-matches",   label: "Search Matches" },
+    ],
+  },
+  {
+    id: "banning",
+    title: "Banning",
+    links: [
+      { href: "/dashboard/detections",    label: "Banned Players" },
+      { href: "/dashboard/banned-ticket", label: "Banned — Waiting Ticket" },
+      { href: "/dashboard/watchlist",     label: "Watch List" },
+    ],
+  },
+  {
+    id: "payment",
+    title: "Payment Issues",
+    links: [
+      { href: "/dashboard/topup", label: "Top-Up" },
+    ],
+  },
+];
+
+const STORAGE_KEY = "ag-nav-open";
 
 export default function Nav({
   codename,
@@ -13,17 +47,27 @@ export default function Nav({
   const pathname = usePathname();
   const router = useRouter();
 
-  const links = [
-    { href: "/dashboard/screenshots", label: "Screenshots" },
-    { href: "/dashboard/screenshots-v2", label: "Screenshots v2" },
-    { href: "/dashboard/ban", label: "Ban / Kick" },
-    { href: "/dashboard/detections", label: "Detections" },
-    { href: "/dashboard/live-matches", label: "Search Matches" },
-    { href: "/dashboard/watchlist", label: "Watch List" },
-    { href: "/dashboard/banned-ticket", label: "Banned — Waiting Ticket" },
-    { href: "/dashboard/topup", label: "Top-Up" },
-    { href: "/dashboard/upload", label: "Upload to R2" },
-  ];
+  // All sections open by default; hydrate from localStorage after mount
+  const [open, setOpen] = useState<Record<string, boolean>>(
+    Object.fromEntries(SECTIONS.map((s) => [s.id, true]))
+  );
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) setOpen(JSON.parse(saved));
+    } catch {}
+    setHydrated(true);
+  }, []);
+
+  function toggle(id: string) {
+    setOpen((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
 
   async function logout() {
     await fetch("/api/logout", { method: "POST" });
@@ -37,30 +81,59 @@ export default function Nav({
         <div className="text-lg font-semibold">AlphaGuard</div>
         <div className="text-xs text-[var(--text-dim)]">Anti-Cheat Portal</div>
       </div>
-      <nav className="flex-1 p-3 space-y-1">
-        {links.map((l) => {
-          const active = pathname?.startsWith(l.href);
+
+      <nav className="flex-1 overflow-y-auto py-3">
+        {SECTIONS.map((section) => {
+          const isOpen = !hydrated || open[section.id] !== false;
+          const hasActive = section.links.some((l) => pathname?.startsWith(l.href));
+
           return (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`block px-3 py-2 rounded-md text-sm ${
-                active
-                  ? "bg-[var(--panel-2)] text-white"
-                  : "text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)]"
-              }`}
-            >
-              {l.label}
-            </Link>
+            <div key={section.id} className="mb-1">
+              {/* Section header */}
+              <button
+                onClick={() => toggle(section.id)}
+                className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors select-none ${
+                  hasActive
+                    ? "text-white"
+                    : "text-[var(--text-dim)] hover:text-white"
+                }`}
+              >
+                <span>{section.title}</span>
+                <span className="text-[10px] opacity-60">
+                  {isOpen ? "▾" : "▸"}
+                </span>
+              </button>
+
+              {/* Section links */}
+              {isOpen && (
+                <div className="mt-0.5 mb-1">
+                  {section.links.map((l) => {
+                    const active = pathname?.startsWith(l.href);
+                    return (
+                      <Link
+                        key={l.href}
+                        href={l.href}
+                        className={`block pl-5 pr-3 py-1.5 rounded-md text-sm transition-colors ${
+                          active
+                            ? "bg-[var(--panel-2)] text-white"
+                            : "text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)]"
+                        }`}
+                      >
+                        {l.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
+
       <div className="p-3 border-t text-sm">
         <div className="px-2 py-1">
           <div className="truncate font-medium">{codename}</div>
-          <div className="text-xs text-[var(--text-dim)] truncate">
-            {roleName}
-          </div>
+          <div className="text-xs text-[var(--text-dim)] truncate">{roleName}</div>
         </div>
         <button
           onClick={logout}
