@@ -28,6 +28,15 @@ type HwidNote = {
   updated_at: string;
 };
 
+type DetectionRecord = {
+  id: number;
+  player_guid: string;
+  flag: string;
+  action: string;
+  description: string | null;
+  date: string;
+};
+
 /* ── Helpers ────────────────────────────────────────────────── */
 function fmtDate(s: string) {
   if (!s) return "—";
@@ -238,6 +247,7 @@ export default function HwidManagerView() {
   const [searchedGuid, setSearchedGuid] = useState("");
   const [sessionCount, setSessionCount] = useState(0);
   const [hwids, setHwids] = useState<HwidRow[]>([]);
+  const [detections, setDetections] = useState<DetectionRecord[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
@@ -283,7 +293,7 @@ export default function HwidManagerView() {
 
   useEffect(() => { loadBanned(); loadNotes(); }, [loadBanned, loadNotes]);
 
-  /* Player HWID lookup */
+  /* Player HWID + Detection lookup */
   async function lookupPlayer(e: React.FormEvent) {
     e.preventDefault();
     const guid = guidInput.trim();
@@ -291,13 +301,22 @@ export default function HwidManagerView() {
     setLookupLoading(true);
     setLookupError(null);
     setHwids([]);
+    setDetections([]);
     setBanError(null);
     try {
-      const res = await fetch(`/api/hwid?player_guid=${encodeURIComponent(guid)}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
-      setHwids(body.hwids as HwidRow[]);
-      setSessionCount(body.session_count as number);
+      const enc = encodeURIComponent(guid);
+      const [hwidRes, detRes] = await Promise.all([
+        fetch(`/api/hwid?player_guid=${enc}`),
+        fetch(`/api/detection-record?player_guid=${enc}`),
+      ]);
+      const hwidBody = await hwidRes.json();
+      if (!hwidRes.ok) throw new Error(hwidBody.error || `Error ${hwidRes.status}`);
+      setHwids(hwidBody.hwids as HwidRow[]);
+      setSessionCount(hwidBody.session_count as number);
+
+      const detBody = await detRes.json();
+      if (detRes.ok) setDetections(detBody.records as DetectionRecord[]);
+
       setSearchedGuid(guid);
     } catch (err) {
       setLookupError(err instanceof Error ? err.message : "Failed to load.");
@@ -514,6 +533,72 @@ export default function HwidManagerView() {
                               Ban
                             </button>
                           )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Detection Records */}
+        {searchedGuid && !lookupLoading && (
+          <div className="mt-6 bg-[var(--panel)] border rounded-lg overflow-hidden">
+            <div className="px-4 py-2.5 border-b bg-[var(--panel-2)] flex items-center justify-between text-sm">
+              <span>
+                Detection Records
+                <span className="ml-2 text-[var(--text-dim)] text-xs">
+                  {detections.length} record{detections.length !== 1 ? "s" : ""}
+                </span>
+              </span>
+            </div>
+            {detections.length === 0 ? (
+              <div className="px-4 py-8 text-center text-[var(--text-dim)] text-sm">
+                No detection records found for this player.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left whitespace-nowrap">Date</th>
+                      <th className="px-4 py-2.5 text-left">Flag</th>
+                      <th className="px-4 py-2.5 text-left">Action</th>
+                      <th className="px-4 py-2.5 text-left">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detections.map((d) => (
+                      <tr key={d.id} className="border-t hover:bg-[var(--panel-2)]/50">
+                        <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
+                          {fmtDate(d.date)}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-xs font-mono px-2 py-0.5 rounded bg-yellow-900/20 text-yellow-300 border border-yellow-700/30">
+                            {d.flag}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {d.action?.toLowerCase().includes("ban") ? (
+                            <span className="text-xs px-2 py-0.5 rounded bg-[var(--danger)]/20 text-[var(--danger)]">
+                              {d.action}
+                            </span>
+                          ) : d.action?.toLowerCase().includes("kick") ? (
+                            <span className="text-xs px-2 py-0.5 rounded bg-orange-900/20 text-orange-400">
+                              {d.action}
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-0.5 rounded bg-[var(--panel-2)] text-[var(--text-dim)]">
+                              {d.action}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] max-w-sm">
+                          <div className="truncate" title={d.description ?? ""}>
+                            {d.description ?? "—"}
+                          </div>
                         </td>
                       </tr>
                     ))}
