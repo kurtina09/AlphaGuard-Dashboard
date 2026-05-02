@@ -22,6 +22,12 @@ type BannedHwid = {
   banned_date: string;
 };
 
+type HwidNote = {
+  banned_hwid_id: number;
+  note: string;
+  updated_at: string;
+};
+
 /* ── Helpers ────────────────────────────────────────────────── */
 function fmtDate(s: string) {
   if (!s) return "—";
@@ -52,11 +58,15 @@ function CopyButton({ text }: { text: string }) {
 /* ── Confirm Modal ──────────────────────────────────────────── */
 function ConfirmModal({
   hwid,
+  note,
+  onNoteChange,
   onConfirm,
   onCancel,
   loading,
 }: {
   hwid: HwidRow;
+  note: string;
+  onNoteChange: (v: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
   loading: boolean;
@@ -72,7 +82,7 @@ function ConfirmModal({
           This will immediately add the following hardware ID to the ban list.
           <strong className="text-white"> The player will be unable to enter the game.</strong>
         </p>
-        <div className="bg-[var(--panel-2)] rounded-md p-3 space-y-2 text-sm mb-6">
+        <div className="bg-[var(--panel-2)] rounded-md p-3 space-y-2 text-sm mb-4">
           <div className="flex justify-between">
             <span className="text-[var(--text-dim)]">Type</span>
             <span className="font-mono font-medium">{hwid.type}</span>
@@ -87,6 +97,18 @@ function ConfirmModal({
               <span className="text-xs text-right">{hwid.description}</span>
             </div>
           )}
+        </div>
+        <div className="mb-5">
+          <label className="block text-xs text-[var(--text-dim)] mb-1.5">
+            Internal note <span className="opacity-60">(optional — stored only in dashboard, not in the game database)</span>
+          </label>
+          <textarea
+            value={note}
+            onChange={(e) => onNoteChange(e.target.value)}
+            placeholder="e.g. Caught speed hacking on 2025-05-01, reported by player XYZ"
+            rows={3}
+            className="w-full px-3 py-2 bg-[var(--panel-2)] border rounded-md text-sm resize-none outline-none focus:border-[var(--accent)] placeholder:text-[var(--text-dim)]/50"
+          />
         </div>
         <div className="flex gap-3">
           <button
@@ -109,6 +131,107 @@ function ConfirmModal({
   );
 }
 
+/* ── Banned Row with inline note editing ───────────────────── */
+function BannedRow({
+  b,
+  note,
+  onUnban,
+  onNoteSaved,
+}: {
+  b: BannedHwid;
+  note: HwidNote | null;
+  onUnban: (id: number) => void;
+  onNoteSaved: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(note?.note ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function saveNote() {
+    setSaving(true);
+    try {
+      await fetch("/api/hwid-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ banned_hwid_id: b.id, note: draft }),
+      });
+      await onNoteSaved();
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <tr className="border-t hover:bg-[var(--panel-2)]/50 align-top">
+      <td className="px-4 py-2.5">
+        <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--panel-2)] border">
+          {b.type}
+        </span>
+      </td>
+      <td className="px-4 py-2.5 max-w-[200px]">
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-xs truncate" title={b.hash}>{b.hash}</span>
+          <CopyButton text={b.hash} />
+        </div>
+      </td>
+      <td className="px-4 py-2.5 text-xs text-[var(--text-dim)]">{b.description ?? "—"}</td>
+      <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">{fmtDate(b.banned_date)}</td>
+      <td className="px-4 py-2.5 min-w-[200px]">
+        {editing ? (
+          <div className="flex flex-col gap-1">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={2}
+              className="w-full px-2 py-1 bg-[var(--panel-2)] border rounded text-xs resize-none outline-none focus:border-[var(--accent)]"
+            />
+            <div className="flex gap-1">
+              <button
+                onClick={saveNote}
+                disabled={saving}
+                className="text-xs px-2 py-0.5 rounded bg-[var(--accent)] text-white disabled:opacity-40"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button
+                onClick={() => { setEditing(false); setDraft(note?.note ?? ""); }}
+                className="text-xs px-2 py-0.5 rounded border text-[var(--text-dim)] hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => setEditing(true)}
+            className="group cursor-pointer"
+            title="Click to edit note"
+          >
+            {note?.note ? (
+              <span className="text-xs text-yellow-300/80 group-hover:text-yellow-300">
+                {note.note}
+              </span>
+            ) : (
+              <span className="text-xs text-[var(--text-dim)]/40 group-hover:text-[var(--text-dim)] italic">
+                Add note…
+              </span>
+            )}
+          </div>
+        )}
+      </td>
+      <td className="px-4 py-2.5">
+        <button
+          onClick={() => onUnban(b.id)}
+          className="text-xs px-3 py-1 rounded border border-[var(--text-dim)]/30 text-[var(--text-dim)] hover:text-[var(--danger)] hover:border-[var(--danger)] transition-colors"
+        >
+          Unban
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 /* ── Main Component ─────────────────────────────────────────── */
 export default function HwidManagerView() {
   const [guidInput, setGuidInput] = useState("");
@@ -123,9 +246,24 @@ export default function HwidManagerView() {
   const [bannedError, setBannedError] = useState<string | null>(null);
   const [bannedSearch, setBannedSearch] = useState("");
 
+  const [notes, setNotes] = useState<Record<number, HwidNote>>({});
   const [confirmTarget, setConfirmTarget] = useState<HwidRow | null>(null);
+  const [pendingNote, setPendingNote] = useState("");
   const [banLoading, setBanLoading] = useState(false);
   const [banError, setBanError] = useState<string | null>(null);
+
+  /* Load notes */
+  const loadNotes = useCallback(async () => {
+    try {
+      const res = await fetch("/api/hwid-notes");
+      const body = await res.json();
+      if (res.ok) {
+        const map: Record<number, HwidNote> = {};
+        for (const n of body.notes as HwidNote[]) map[n.banned_hwid_id] = n;
+        setNotes(map);
+      }
+    } catch {}
+  }, []);
 
   /* Load banned list */
   const loadBanned = useCallback(async () => {
@@ -143,7 +281,7 @@ export default function HwidManagerView() {
     }
   }, []);
 
-  useEffect(() => { loadBanned(); }, [loadBanned]);
+  useEffect(() => { loadBanned(); loadNotes(); }, [loadBanned, loadNotes]);
 
   /* Player HWID lookup */
   async function lookupPlayer(e: React.FormEvent) {
@@ -186,16 +324,28 @@ export default function HwidManagerView() {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
 
+      const newBannedId = body.id as number;
+
+      // Save note if provided (local only, does not touch the game DB)
+      if (pendingNote.trim()) {
+        await fetch("/api/hwid-notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ banned_hwid_id: newBannedId, note: pendingNote.trim() }),
+        });
+      }
+
       // Update hwid row in local state
       setHwids((prev) =>
         prev.map((h) =>
           h.type === confirmTarget.type && h.hash === confirmTarget.hash
-            ? { ...h, is_banned: true, banned_hwid_id: body.id }
+            ? { ...h, is_banned: true, banned_hwid_id: newBannedId }
             : h,
         ),
       );
       setConfirmTarget(null);
-      await loadBanned();
+      setPendingNote("");
+      await Promise.all([loadBanned(), loadNotes()]);
     } catch (err) {
       setBanError(err instanceof Error ? err.message : "Ban failed.");
     } finally {
@@ -236,8 +386,10 @@ export default function HwidManagerView() {
       {confirmTarget && (
         <ConfirmModal
           hwid={confirmTarget}
+          note={pendingNote}
+          onNoteChange={setPendingNote}
           onConfirm={executeBan}
-          onCancel={() => { setConfirmTarget(null); setBanError(null); }}
+          onCancel={() => { setConfirmTarget(null); setBanError(null); setPendingNote(""); }}
           loading={banLoading}
         />
       )}
@@ -421,38 +573,19 @@ export default function HwidManagerView() {
                     <th className="px-4 py-2.5 text-left">Hash</th>
                     <th className="px-4 py-2.5 text-left">Description</th>
                     <th className="px-4 py-2.5 text-left whitespace-nowrap">Banned Date</th>
+                    <th className="px-4 py-2.5 text-left">Internal Note</th>
                     <th className="px-4 py-2.5 text-left">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredBanned.map((b) => (
-                    <tr key={b.id} className="border-t hover:bg-[var(--panel-2)]/50">
-                      <td className="px-4 py-2.5">
-                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--panel-2)] border">
-                          {b.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 max-w-[200px]">
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono text-xs truncate" title={b.hash}>{b.hash}</span>
-                          <CopyButton text={b.hash} />
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-[var(--text-dim)]">
-                        {b.description ?? "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
-                        {fmtDate(b.banned_date)}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <button
-                          onClick={() => unban(b.id)}
-                          className="text-xs px-3 py-1 rounded border border-[var(--text-dim)]/30 text-[var(--text-dim)] hover:text-[var(--danger)] hover:border-[var(--danger)] transition-colors"
-                        >
-                          Unban
-                        </button>
-                      </td>
-                    </tr>
+                    <BannedRow
+                      key={b.id}
+                      b={b}
+                      note={notes[b.id] ?? null}
+                      onUnban={unban}
+                      onNoteSaved={loadNotes}
+                    />
                   ))}
                 </tbody>
               </table>
