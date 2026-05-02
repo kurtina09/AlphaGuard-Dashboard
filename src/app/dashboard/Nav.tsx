@@ -21,10 +21,11 @@ const SECTIONS: Section[] = [
     id: "banning",
     title: "Banning",
     links: [
-      { href: "/dashboard/hwid-manager",   label: "HWID Manager" },
-      { href: "/dashboard/detections",    label: "Banned Players" },
-      { href: "/dashboard/banned-ticket", label: "Banned — Waiting Ticket" },
-      { href: "/dashboard/watchlist",     label: "Watch List" },
+      { href: "/dashboard/hwid-manager",       label: "HWID Manager" },
+      { href: "/dashboard/detections",        label: "Banned Players" },
+      { href: "/dashboard/banned-ticket",     label: "Banned — Waiting Ticket" },
+      { href: "/dashboard/watchlist",         label: "Watch List" },
+      { href: "/dashboard/detection-record",  label: "Detection Records" },
     ],
   },
   {
