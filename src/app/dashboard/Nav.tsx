@@ -77,9 +77,17 @@ export default function Nav({
 
   return (
     <aside className="w-60 shrink-0 border-r bg-[var(--panel)] flex flex-col">
-      <div className="px-5 py-5 border-b">
-        <div className="text-lg font-semibold">AlphaGuard</div>
-        <div className="text-xs text-[var(--text-dim)]">Anti-Cheat Portal</div>
+      <div className="px-4 py-4 border-b flex items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-icon.png" alt="AlphaGuard" className="w-10 h-10 shrink-0" />
+        <div>
+          <div className="text-base font-bold tracking-wide" style={{ color: "var(--accent)" }}>
+            AlphaGuard
+          </div>
+          <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
+            Anti-Cheat
+          </div>
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3">
@@ -94,8 +102,8 @@ export default function Nav({
                 onClick={() => toggle(section.id)}
                 className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors select-none ${
                   hasActive
-                    ? "text-white"
-                    : "text-[var(--text-dim)] hover:text-white"
+                    ? "text-[var(--accent)]"
+                    : "text-[var(--text-dim)] hover:text-[var(--accent)]"
                 }`}
               >
                 <span>{section.title}</span>

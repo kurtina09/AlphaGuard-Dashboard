@@ -8,11 +8,14 @@ export default async function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">AlphaGuard</h1>
-          <p className="text-sm text-[var(--text-dim)] mt-1">
-            Anti-Cheat Portal
-          </p>
+        <div className="mb-8 flex flex-col items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-banner.png"
+            alt="AlphaGuard Anti-Cheat"
+            className="w-full max-w-xs rounded-lg"
+          />
+          <p className="text-sm text-[var(--text-dim)]">Admin Portal</p>
         </div>
         <LoginForm />
       </div>
