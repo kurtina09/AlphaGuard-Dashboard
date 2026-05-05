@@ -26,7 +26,6 @@ const SECTIONS: Section[] = [
       { href: "/dashboard/detections",        label: "Banned Players" },
       { href: "/dashboard/banned-ticket",     label: "Banned — Waiting Ticket" },
       { href: "/dashboard/watchlist",         label: "Watch List" },
-      { href: "/dashboard/whitelist",         label: "Whitelist" },
       { href: "/dashboard/detection-record",  label: "Detection Records" },
     ],
   },
@@ -34,7 +33,8 @@ const SECTIONS: Section[] = [
     id: "payment",
     title: "Payment Issues",
     links: [
-      { href: "/dashboard/topup", label: "Top-Up" },
+      { href: "/dashboard/topup",     label: "Top-Up" },
+      { href: "/dashboard/whitelist", label: "Whitelist" },
     ],
   },
 ];
