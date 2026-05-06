@@ -34,9 +34,8 @@ export async function GET() {
   try {
     const pool = getPool();
 
-    // JOIN through hwid → session to get the player_guid associated with each ban
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT bh.id, bh.type, bh.hash, bh.description, bh.banned_date,
+      `SELECT bh.id, bh.type, bh.hash, bh.description, bh.banned_date, bh.notes,
               s.player_guid
        FROM banned_hwid bh
        LEFT JOIN hwid h ON h.id = bh.id
@@ -46,12 +45,13 @@ export async function GET() {
 
     const items = rows.map((r) => ({
       id: r.id as number,
-      type: r.type as string,
+      type: String(r.type ?? ""),           // int in DB — always coerce to string
       hash: r.hash as string,
       description: (r.description as string | null) ?? null,
       banned_date: r.banned_date instanceof Date
         ? r.banned_date.toISOString()
         : String(r.banned_date ?? ""),
+      notes: (r.notes as string | null) ?? null,
       player_guid: (r.player_guid as string | null) ?? null,
       codename: null as string | null,
     }));
@@ -83,11 +83,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, type, hash, description } = await req.json() as {
+  const { id, type, hash, description, notes } = await req.json() as {
     id: number;
     type: string;
     hash: string;
     description?: string;
+    notes?: string;
   };
 
   if (!id || !type || !hash) {
@@ -97,7 +98,6 @@ export async function POST(req: Request) {
   try {
     const pool = getPool();
 
-    // Check for duplicate
     const [existing] = await pool.query<RowDataPacket[]>(
       "SELECT id FROM banned_hwid WHERE type = ? AND hash = ? LIMIT 1",
       [type, hash],
@@ -107,8 +107,8 @@ export async function POST(req: Request) {
     }
 
     await pool.query(
-      "INSERT INTO banned_hwid (id, type, hash, description, banned_date) VALUES (?, ?, ?, ?, NOW())",
-      [id, type, hash, description ?? null],
+      "INSERT INTO banned_hwid (id, type, hash, description, banned_date, notes) VALUES (?, ?, ?, ?, NOW(), ?)",
+      [id, type, hash, description ?? null, notes?.trim() || null],
     );
 
     return NextResponse.json({ success: true, id });

@@ -20,14 +20,9 @@ type BannedHwid = {
   hash: string;
   description: string | null;
   banned_date: string;
+  notes: string | null;
   player_guid: string | null;
   codename: string | null;
-};
-
-type HwidNote = {
-  banned_hwid_id: number;
-  note: string;
-  updated_at: string;
 };
 
 type DetectionRecord = {
@@ -145,28 +140,31 @@ function ConfirmModal({
 /* ── Banned Row with inline note editing ───────────────────── */
 function BannedRow({
   b,
-  note,
   onUnban,
-  onNoteSaved,
+  onNoteUpdated,
 }: {
   b: BannedHwid;
-  note: HwidNote | null;
   onUnban: (id: number) => void;
-  onNoteSaved: () => Promise<void>;
+  onNoteUpdated: (id: number, notes: string | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(note?.note ?? "");
+  const [draft, setDraft] = useState(b.notes ?? "");
   const [saving, setSaving] = useState(false);
+
+  // Sync draft when b.notes changes from outside (e.g. after reload)
+  useEffect(() => {
+    if (!editing) setDraft(b.notes ?? "");
+  }, [b.notes, editing]);
 
   async function saveNote() {
     setSaving(true);
     try {
-      await fetch("/api/hwid-notes", {
-        method: "POST",
+      await fetch(`/api/banned-hwid/${b.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ banned_hwid_id: b.id, note: draft }),
+        body: JSON.stringify({ notes: draft }),
       });
-      await onNoteSaved();
+      onNoteUpdated(b.id, draft.trim() || null);
       setEditing(false);
     } finally {
       setSaving(false);
@@ -230,7 +228,7 @@ function BannedRow({
                 {saving ? "Saving…" : "Save"}
               </button>
               <button
-                onClick={() => { setEditing(false); setDraft(note?.note ?? ""); }}
+                onClick={() => { setEditing(false); setDraft(b.notes ?? ""); }}
                 className="text-xs px-2 py-0.5 rounded border text-[var(--text-dim)] hover:text-white"
               >
                 Cancel
@@ -243,9 +241,9 @@ function BannedRow({
             className="group cursor-pointer"
             title="Click to edit note"
           >
-            {note?.note ? (
+            {b.notes ? (
               <span className="text-xs text-yellow-300/80 group-hover:text-yellow-300">
-                {note.note}
+                {b.notes}
               </span>
             ) : (
               <span className="text-xs text-[var(--text-dim)]/40 group-hover:text-[var(--text-dim)] italic">
@@ -282,24 +280,10 @@ export default function HwidManagerView() {
   const [bannedError, setBannedError] = useState<string | null>(null);
   const [bannedSearch, setBannedSearch] = useState("");
 
-  const [notes, setNotes] = useState<Record<number, HwidNote>>({});
   const [confirmTarget, setConfirmTarget] = useState<HwidRow | null>(null);
   const [pendingNote, setPendingNote] = useState("");
   const [banLoading, setBanLoading] = useState(false);
   const [banError, setBanError] = useState<string | null>(null);
-
-  /* Load notes */
-  const loadNotes = useCallback(async () => {
-    try {
-      const res = await fetch("/api/hwid-notes");
-      const body = await res.json();
-      if (res.ok) {
-        const map: Record<number, HwidNote> = {};
-        for (const n of body.notes as HwidNote[]) map[n.banned_hwid_id] = n;
-        setNotes(map);
-      }
-    } catch {}
-  }, []);
 
   /* Load banned list */
   const loadBanned = useCallback(async () => {
@@ -317,7 +301,7 @@ export default function HwidManagerView() {
     }
   }, []);
 
-  useEffect(() => { loadBanned(); loadNotes(); }, [loadBanned, loadNotes]);
+  useEffect(() => { loadBanned(); }, [loadBanned]);
 
   /* Player HWID + Detection lookup */
   async function lookupPlayer(e: React.FormEvent) {
@@ -365,21 +349,13 @@ export default function HwidManagerView() {
           type: confirmTarget.type,
           hash: confirmTarget.hash,
           description: confirmTarget.description ?? undefined,
+          notes: pendingNote.trim() || undefined,
         }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
 
       const newBannedId = body.id as number;
-
-      // Save note if provided (local only, does not touch the game DB)
-      if (pendingNote.trim()) {
-        await fetch("/api/hwid-notes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ banned_hwid_id: newBannedId, note: pendingNote.trim() }),
-        });
-      }
 
       // Update hwid row in local state
       setHwids((prev) =>
@@ -391,7 +367,7 @@ export default function HwidManagerView() {
       );
       setConfirmTarget(null);
       setPendingNote("");
-      await Promise.all([loadBanned(), loadNotes()]);
+      await loadBanned();
     } catch (err) {
       setBanError(err instanceof Error ? err.message : "Ban failed.");
     } finally {
@@ -697,9 +673,12 @@ export default function HwidManagerView() {
                     <BannedRow
                       key={b.id}
                       b={b}
-                      note={notes[b.id] ?? null}
                       onUnban={unban}
-                      onNoteSaved={loadNotes}
+                      onNoteUpdated={(id, updatedNotes) =>
+                        setBannedList((prev) =>
+                          prev.map((row) => row.id === id ? { ...row, notes: updatedNotes } : row)
+                        )
+                      }
                     />
                   ))}
                 </tbody>
