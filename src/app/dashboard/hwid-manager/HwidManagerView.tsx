@@ -657,6 +657,22 @@ export default function HwidManagerView() {
           >
             {lookupLoading ? "Looking up…" : "Lookup"}
           </button>
+          {(searchedQuery || hwids.length > 0) && (
+            <button
+              type="button"
+              onClick={() => {
+                setGuidInput("");
+                setSearchedQuery("");
+                setHwids([]);
+                setDetections([]);
+                setLookupError(null);
+                setBanError(null);
+              }}
+              className="px-4 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-dim)] hover:text-white hover:border-[var(--accent)] transition-colors"
+            >
+              Clear
+            </button>
+          )}
         </form>
 
         {lookupError && (
