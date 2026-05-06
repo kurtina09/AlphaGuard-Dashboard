@@ -53,8 +53,8 @@ export async function GET(req: Request) {
     const records: DetectionRecord[] = rows.map((r) => ({
       id: r.id as number,
       player_guid: r.player_guid as string,
-      flag: r.flag as string,
-      action: r.action as string,
+      flag: String(r.flag ?? ""),           // int/string in DB — always coerce
+      action: String(r.action ?? ""),       // int in DB — always coerce
       description: (r.description as string | null) ?? null,
       date: r.date instanceof Date ? r.date.toISOString() : String(r.date ?? ""),
     }));

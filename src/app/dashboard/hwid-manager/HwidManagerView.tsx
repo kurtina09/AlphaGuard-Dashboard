@@ -265,6 +265,14 @@ function BannedRow({
   );
 }
 
+/* ── Action badge (0=No Effect, 1=Disconnected, 2=Banned, 3=HWID Banned) ── */
+const DET_ACTION: Record<string, { label: string; className: string }> = {
+  "0": { label: "No Effect",    className: "bg-[var(--panel-2)] text-[var(--text-dim)]" },
+  "1": { label: "Disconnected", className: "bg-orange-900/20 text-orange-400" },
+  "2": { label: "Banned",       className: "bg-[var(--danger)]/20 text-[var(--danger)]" },
+  "3": { label: "HWID Banned",  className: "bg-purple-900/20 text-purple-400" },
+};
+
 /* ── Main Component ─────────────────────────────────────────── */
 export default function HwidManagerView() {
   const [guidInput, setGuidInput] = useState("");
@@ -586,19 +594,14 @@ export default function HwidManagerView() {
                           </span>
                         </td>
                         <td className="px-4 py-2.5">
-                          {d.action?.toLowerCase().includes("ban") ? (
-                            <span className="text-xs px-2 py-0.5 rounded bg-[var(--danger)]/20 text-[var(--danger)]">
-                              {d.action}
-                            </span>
-                          ) : d.action?.toLowerCase().includes("kick") ? (
-                            <span className="text-xs px-2 py-0.5 rounded bg-orange-900/20 text-orange-400">
-                              {d.action}
-                            </span>
-                          ) : (
-                            <span className="text-xs px-2 py-0.5 rounded bg-[var(--panel-2)] text-[var(--text-dim)]">
-                              {d.action}
-                            </span>
-                          )}
+                          {(() => {
+                            const entry = DET_ACTION[d.action] ?? { label: d.action || "—", className: "bg-[var(--panel-2)] text-[var(--text-dim)]" };
+                            return (
+                              <span className={`text-xs px-2 py-0.5 rounded ${entry.className}`}>
+                                {entry.label}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] max-w-sm">
                           <div className="truncate" title={d.description ?? ""}>
