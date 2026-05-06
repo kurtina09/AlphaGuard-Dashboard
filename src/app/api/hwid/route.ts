@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     return {
       id: r.id as number,
       session_id: "",
-      type: r.type as string,
+      type: String(r.type ?? ""),   // int in DB — coerce to string so Set/map lookups work
       hash: r.hash as string,
       description: (r.description as string | null) ?? null,
       created_at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at ?? ""),
