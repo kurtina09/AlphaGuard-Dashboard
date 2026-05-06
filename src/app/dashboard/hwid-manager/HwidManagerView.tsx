@@ -743,8 +743,6 @@ export default function HwidManagerView() {
                               className={`border-t border-[var(--border)]/40 transition-colors ${
                                 h.is_banned
                                   ? "bg-red-950/20 hover:bg-red-950/30"
-                                  : changed
-                                  ? `${color.rowBg} hover:brightness-110`
                                   : "hover:bg-[var(--panel-2)]/50"
                               }`}
                             >
@@ -778,17 +776,20 @@ export default function HwidManagerView() {
                                 </span>
                               </td>
 
-                              {/* Hash — type's pastel color only when changed */}
+                              {/* Hash — warning icon when value changed across sessions */}
                               <td className="px-4 py-2.5 max-w-[200px]">
                                 <div className="flex items-center gap-1">
-                                  <span
-                                    className={`font-mono text-xs truncate ${changed ? color.text : ""}`}
-                                    title={changed
-                                      ? `${hwidType(h.type)} value differs between sessions — possible spoof or hardware swap`
-                                      : h.hash}
-                                  >
+                                  <span className="font-mono text-xs truncate" title={h.hash}>
                                     {h.hash}
                                   </span>
+                                  {changed && (
+                                    <span
+                                      title={`${hwidType(h.type)} value differs between sessions — possible hardware swap or spoofing`}
+                                      className="shrink-0 text-yellow-400 text-xs leading-none"
+                                    >
+                                      ⚠
+                                    </span>
+                                  )}
                                   <CopyButton text={h.hash} />
                                 </div>
                               </td>
