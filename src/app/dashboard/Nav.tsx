@@ -14,19 +14,25 @@ const SECTIONS: Section[] = [
     links: [
       { href: "/dashboard/screenshots",    label: "Screenshots v1 (Inactive)" },
       { href: "/dashboard/screenshots-v2", label: "Screenshots v2" },
+    ],
+  },
+  {
+    id: "records",
+    title: "Records",
+    links: [
       { href: "/dashboard/live-matches",   label: "Search Matches" },
+      { href: "/dashboard/detection-record", label: "Detection Records" },
+      { href: "/dashboard/watchlist",      label: "Watch List" },
     ],
   },
   {
     id: "banning",
     title: "Banning",
     links: [
-      { href: "/dashboard/hwid-manager",       label: "BAN — HWID" },
-      { href: "/dashboard/ban",               label: "BAN — Account" },
-      { href: "/dashboard/detections",        label: "Banned Players" },
-      { href: "/dashboard/banned-ticket",     label: "Banned — Waiting Ticket" },
-      { href: "/dashboard/watchlist",         label: "Watch List" },
-      { href: "/dashboard/detection-record",  label: "Detection Records" },
+      { href: "/dashboard/hwid-manager",   label: "BAN — HWID" },
+      { href: "/dashboard/ban",            label: "BAN — Account" },
+      { href: "/dashboard/detections",     label: "Banned Players" },
+      { href: "/dashboard/banned-ticket",  label: "Banned — Waiting Ticket" },
     ],
   },
   {
