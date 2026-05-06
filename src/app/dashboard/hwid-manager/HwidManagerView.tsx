@@ -97,10 +97,16 @@ function deduplicateHwids(hwids: HwidRow[]): HwidRow[] {
  * Returns a Set of "player|||type|||hash" keys for rows that belong to a
  * (player, type) group with more than one distinct hash value — meaning the
  * hardware identifier changed at some point.
+ *
+ * DISK (4) and MONITOR (6) are excluded because players legitimately have
+ * multiple disks and monitors.
  */
+const CHANGE_EXEMPT_TYPES = new Set(["4", "6"]); // DISK, MONITOR
+
 function getChangedRowKeys(hwids: HwidRow[]): Set<string> {
   const groups = new Map<string, Set<string>>();
   for (const h of hwids) {
+    if (CHANGE_EXEMPT_TYPES.has(h.type)) continue;   // skip DISK & MONITOR
     const groupKey = `${h.player_guid ?? ""}|||${h.type}`;
     if (!groups.has(groupKey)) groups.set(groupKey, new Set());
     groups.get(groupKey)!.add(h.hash);
