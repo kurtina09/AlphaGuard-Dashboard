@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DetectionRecord } from "@/app/api/detection-record/route";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmt(raw: string) {
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleString("en-PH", { timeZone: "Asia/Manila" });
+}
+
 // ── Action mapping ────────────────────────────────────────────────────────────
 const ACTION_LABEL: Record<string, { label: string; className: string }> = {
   "0": { label: "No Effect",   className: "text-[var(--text-dim)]" },
@@ -140,6 +147,7 @@ export default function DetectionRecordView() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--panel-2)]">
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider whitespace-nowrap">Date (PHT)</th>
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">Player GUID</th>
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider w-36">Action</th>
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">Description</th>
@@ -148,16 +156,19 @@ export default function DetectionRecordView() {
             <tbody>
               {loading && records.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="text-center py-12 text-[var(--text-dim)]">Loading…</td>
+                  <td colSpan={4} className="text-center py-12 text-[var(--text-dim)]">Loading…</td>
                 </tr>
               )}
               {!loading && records.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="text-center py-12 text-[var(--text-dim)]">No records found.</td>
+                  <td colSpan={4} className="text-center py-12 text-[var(--text-dim)]">No records found.</td>
                 </tr>
               )}
               {records.map((rec) => (
                 <tr key={rec.id} className="border-b border-[var(--border)] hover:bg-[var(--panel-2)] transition-colors">
+                  <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap font-mono">
+                    {fmt(rec.date)}
+                  </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center font-mono text-xs">
                       <span className="truncate max-w-[220px]" title={rec.player_guid}>
