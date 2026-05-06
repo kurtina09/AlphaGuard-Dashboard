@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 /* ── Types ─────────────────────────────────────────────────── */
+type SearchMode = "guid" | "hash" | "description";
+
 type HwidRow = {
   id: number;
   type: string;
@@ -12,6 +14,7 @@ type HwidRow = {
   last_seen: string;
   is_banned: boolean;
   banned_hwid_id: number | null;
+  player_guid: string | null;
 };
 
 type BannedHwid = {
@@ -275,8 +278,10 @@ const DET_ACTION: Record<string, { label: string; className: string }> = {
 
 /* ── Main Component ─────────────────────────────────────────── */
 export default function HwidManagerView() {
+  const [searchMode, setSearchMode] = useState<SearchMode>("guid");
   const [guidInput, setGuidInput] = useState("");
-  const [searchedGuid, setSearchedGuid] = useState("");
+  const [searchedQuery, setSearchedQuery] = useState("");
+  const [searchedMode, setSearchedMode] = useState<SearchMode>("guid");
   const [sessionCount, setSessionCount] = useState(0);
   const [hwids, setHwids] = useState<HwidRow[]>([]);
   const [detections, setDetections] = useState<DetectionRecord[]>([]);
@@ -314,33 +319,73 @@ export default function HwidManagerView() {
   /* Player HWID + Detection lookup */
   async function lookupPlayer(e: React.FormEvent) {
     e.preventDefault();
-    const guid = guidInput.trim();
-    if (!guid) return;
+    const q = guidInput.trim();
+    if (!q) return;
     setLookupLoading(true);
     setLookupError(null);
     setHwids([]);
     setDetections([]);
     setBanError(null);
     try {
-      const enc = encodeURIComponent(guid);
-      const [hwidRes, detRes] = await Promise.all([
-        fetch(`/api/hwid?player_guid=${enc}`),
-        fetch(`/api/detection-record?player_guid=${enc}`),
-      ]);
+      const enc = encodeURIComponent(q);
+      const paramKey = searchMode === "guid" ? "player_guid"
+        : searchMode === "hash" ? "hash"
+        : "description";
+
+      const hwidRes = await fetch(`/api/hwid?${paramKey}=${enc}`);
       const hwidBody = await hwidRes.json();
       if (!hwidRes.ok) throw new Error(hwidBody.error || `Error ${hwidRes.status}`);
       setHwids(hwidBody.hwids as HwidRow[]);
       setSessionCount(hwidBody.session_count as number);
 
-      const detBody = await detRes.json();
-      if (detRes.ok) setDetections(detBody.records as DetectionRecord[]);
+      // Detection records only available for GUID search
+      if (searchMode === "guid") {
+        const detRes = await fetch(`/api/detection-record?player_guid=${enc}`);
+        const detBody = await detRes.json();
+        if (detRes.ok) setDetections(detBody.records as DetectionRecord[]);
+      }
 
-      setSearchedGuid(guid);
+      setSearchedQuery(q);
+      setSearchedMode(searchMode);
     } catch (err) {
       setLookupError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
       setLookupLoading(false);
     }
+  }
+
+  /* Switch to GUID mode and look up a specific player */
+  function lookupByGuid(guid: string) {
+    setSearchMode("guid");
+    setGuidInput(guid);
+    setSearchedQuery("");
+    setHwids([]);
+    setDetections([]);
+    setLookupError(null);
+    setBanError(null);
+    // Trigger the fetch after state settles
+    setTimeout(async () => {
+      setLookupLoading(true);
+      try {
+        const enc = encodeURIComponent(guid);
+        const [hwidRes, detRes] = await Promise.all([
+          fetch(`/api/hwid?player_guid=${enc}`),
+          fetch(`/api/detection-record?player_guid=${enc}`),
+        ]);
+        const hwidBody = await hwidRes.json();
+        if (!hwidRes.ok) throw new Error(hwidBody.error || `Error ${hwidRes.status}`);
+        setHwids(hwidBody.hwids as HwidRow[]);
+        setSessionCount(hwidBody.session_count as number);
+        const detBody = await detRes.json();
+        if (detRes.ok) setDetections(detBody.records as DetectionRecord[]);
+        setSearchedQuery(guid);
+        setSearchedMode("guid");
+      } catch (err) {
+        setLookupError(err instanceof Error ? err.message : "Failed to load.");
+      } finally {
+        setLookupLoading(false);
+      }
+    }, 0);
   }
 
   /* Execute ban */
@@ -429,12 +474,35 @@ export default function HwidManagerView() {
       {/* ── Player HWID Lookup ── */}
       <section className="mb-10">
         <h2 className="text-lg font-semibold mb-3">Player HWID Lookup</h2>
+
+        {/* Search mode toggle */}
+        <div className="flex gap-1 mb-2">
+          {(["guid", "hash", "description"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => { setSearchMode(mode); setGuidInput(""); }}
+              className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                searchMode === mode
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-[var(--panel-2)] text-[var(--text-dim)] hover:text-white border border-[var(--border)]"
+              }`}
+            >
+              {mode === "guid" ? "Player GUID" : mode === "hash" ? "Hash" : "Description"}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={lookupPlayer} className="flex gap-2 mb-4">
           <input
             type="text"
             value={guidInput}
             onChange={(e) => setGuidInput(e.target.value)}
-            placeholder="Enter player GUID (e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+            placeholder={
+              searchMode === "guid"        ? "Enter player GUID (e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)" :
+              searchMode === "hash"        ? "Enter exact HWID hash…" :
+                                             "Search description…"
+            }
             spellCheck={false}
             className="flex-1 bg-[var(--panel)] border rounded-lg px-4 py-2.5 text-sm font-mono placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
           />
@@ -459,15 +527,18 @@ export default function HwidManagerView() {
           </div>
         )}
 
-        {searchedGuid && !lookupLoading && (
+        {searchedQuery && !lookupLoading && (
           <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
             <div className="px-4 py-2.5 border-b bg-[var(--panel-2)] flex items-center justify-between text-sm">
               <span>
-                <span className="font-mono text-xs text-[var(--text-dim)]">{searchedGuid}</span>
+                <span className="font-mono text-xs text-[var(--text-dim)]">{searchedQuery}</span>
                 {" — "}
-                <span className="font-medium">{hwids.length}</span> unique HWID{hwids.length !== 1 ? "s" : ""}
-                {" across "}
-                <span className="font-medium">{sessionCount}</span> session{sessionCount !== 1 ? "s" : ""}
+                <span className="font-medium">{hwids.length}</span> HWID{hwids.length !== 1 ? "s" : ""}
+                {searchedMode === "guid" ? (
+                  <> across <span className="font-medium">{sessionCount}</span> session{sessionCount !== 1 ? "s" : ""}</>
+                ) : (
+                  <> across <span className="font-medium">{sessionCount}</span> player{sessionCount !== 1 ? "s" : ""}</>
+                )}
               </span>
             </div>
 
@@ -480,6 +551,9 @@ export default function HwidManagerView() {
                 <table className="w-full text-sm">
                   <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
                     <tr>
+                      {searchedMode !== "guid" && (
+                        <th className="px-4 py-2.5 text-left">Player</th>
+                      )}
                       <th className="px-4 py-2.5 text-left">Type</th>
                       <th className="px-4 py-2.5 text-left">Hash</th>
                       <th className="px-4 py-2.5 text-left">Description</th>
@@ -490,15 +564,37 @@ export default function HwidManagerView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {hwids.map((h) => (
+                    {hwids.map((h, i) => (
                       <tr
-                        key={`${h.type}-${h.hash}`}
+                        key={`${h.type}-${h.hash}-${i}`}
                         className={`border-t transition-colors ${
                           h.is_banned
                             ? "bg-red-950/20 hover:bg-red-950/30"
                             : "hover:bg-[var(--panel-2)]/50"
                         }`}
                       >
+                        {searchedMode !== "guid" && (
+                          <td className="px-4 py-2.5 min-w-[140px]">
+                            {h.player_guid ? (
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[110px]" title={h.player_guid}>
+                                    {h.player_guid}
+                                  </span>
+                                  <CopyButton text={h.player_guid} />
+                                </div>
+                                <button
+                                  onClick={() => lookupByGuid(h.player_guid!)}
+                                  className="text-[10px] text-[var(--accent)] hover:underline text-left"
+                                >
+                                  Full lookup ↗
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-[var(--text-dim)]">—</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-2.5">
                           <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--panel-2)] border">
                             {h.type}
@@ -556,8 +652,8 @@ export default function HwidManagerView() {
           </div>
         )}
 
-        {/* Detection Records */}
-        {searchedGuid && !lookupLoading && (
+        {/* Detection Records — GUID mode only */}
+        {searchedQuery && searchedMode === "guid" && !lookupLoading && (
           <div className="mt-6 bg-[var(--panel)] border rounded-lg overflow-hidden">
             <div className="px-4 py-2.5 border-b bg-[var(--panel-2)] flex items-center justify-between text-sm">
               <span>
