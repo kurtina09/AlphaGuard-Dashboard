@@ -411,17 +411,31 @@ const DET_ACTION: Record<string, { label: string; className: string }> = {
   "3": { label: "HWID Banned",  className: "bg-purple-900/20 text-purple-400" },
 };
 
+/* ── Per-tab state ──────────────────────────────────────────── */
+type ModeState = {
+  query:        string;
+  hwids:        HwidRow[];
+  detections:   DetectionRecord[];
+  sessionCount: number;
+  loading:      boolean;
+  error:        string | null;
+};
+
+const emptyModeState = (): ModeState => ({
+  query: "", hwids: [], detections: [], sessionCount: 0, loading: false, error: null,
+});
+
 /* ── Main Component ─────────────────────────────────────────── */
 export default function HwidManagerView() {
   const [searchMode, setSearchMode] = useState<SearchMode>("guid");
-  const [guidInput, setGuidInput] = useState("");
-  const [searchedQuery, setSearchedQuery] = useState("");
-  const [searchedMode, setSearchedMode] = useState<SearchMode>("guid");
-  const [sessionCount, setSessionCount] = useState(0);
-  const [hwids, setHwids] = useState<HwidRow[]>([]);
-  const [detections, setDetections] = useState<DetectionRecord[]>([]);
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [lookupError, setLookupError] = useState<string | null>(null);
+
+  // Each tab keeps its own input + results independently
+  const [modeInputs, setModeInputs] = useState<Record<SearchMode, string>>({
+    guid: "", hash: "", description: "",
+  });
+  const [modeStates, setModeStates] = useState<Record<SearchMode, ModeState>>({
+    guid: emptyModeState(), hash: emptyModeState(), description: emptyModeState(),
+  });
 
   const [bannedList, setBannedList] = useState<BannedHwid[]>([]);
   const [bannedLoading, setBannedLoading] = useState(false);
@@ -432,6 +446,9 @@ export default function HwidManagerView() {
   const [pendingNote, setPendingNote] = useState("");
   const [banLoading, setBanLoading] = useState(false);
   const [banError, setBanError] = useState<string | null>(null);
+
+  // Convenience alias for the active tab's state
+  const ms = modeStates[searchMode];
 
   /* Load banned list */
   const loadBanned = useCallback(async () => {
@@ -451,56 +468,53 @@ export default function HwidManagerView() {
 
   useEffect(() => { loadBanned(); }, [loadBanned]);
 
+  /* Helpers to update a specific tab's state */
+  function setMode(mode: SearchMode, patch: Partial<ModeState>) {
+    setModeStates((prev) => ({ ...prev, [mode]: { ...prev[mode], ...patch } }));
+  }
+
   /* Player HWID + Detection lookup */
   async function lookupPlayer(e: React.FormEvent) {
     e.preventDefault();
-    const q = guidInput.trim();
+    const q = modeInputs[searchMode].trim();
     if (!q) return;
-    setLookupLoading(true);
-    setLookupError(null);
-    setHwids([]);
-    setDetections([]);
+    setMode(searchMode, { loading: true, error: null, hwids: [], detections: [] });
     setBanError(null);
     try {
-      const enc = encodeURIComponent(q);
+      const enc      = encodeURIComponent(q);
       const paramKey = searchMode === "guid" ? "player_guid"
-        : searchMode === "hash" ? "hash"
-        : "description";
+        : searchMode === "hash" ? "hash" : "description";
 
-      const hwidRes = await fetch(`/api/hwid?${paramKey}=${enc}`);
+      const hwidRes  = await fetch(`/api/hwid?${paramKey}=${enc}`);
       const hwidBody = await hwidRes.json();
       if (!hwidRes.ok) throw new Error(hwidBody.error || `Error ${hwidRes.status}`);
-      setHwids(hwidBody.hwids as HwidRow[]);
-      setSessionCount(hwidBody.session_count as number);
 
-      // Detection records only available for GUID search
+      let detections: DetectionRecord[] = [];
       if (searchMode === "guid") {
-        const detRes = await fetch(`/api/detection-record?player_guid=${enc}`);
+        const detRes  = await fetch(`/api/detection-record?player_guid=${enc}`);
         const detBody = await detRes.json();
-        if (detRes.ok) setDetections(detBody.records as DetectionRecord[]);
+        if (detRes.ok) detections = detBody.records as DetectionRecord[];
       }
 
-      setSearchedQuery(q);
-      setSearchedMode(searchMode);
+      setMode(searchMode, {
+        query: q,
+        hwids:        hwidBody.hwids as HwidRow[],
+        sessionCount: hwidBody.session_count as number,
+        detections,
+        loading: false,
+      });
     } catch (err) {
-      setLookupError(err instanceof Error ? err.message : "Failed to load.");
-    } finally {
-      setLookupLoading(false);
+      setMode(searchMode, { loading: false, error: err instanceof Error ? err.message : "Failed to load." });
     }
   }
 
-  /* Switch to GUID mode and look up a specific player */
+  /* Switch to GUID tab and look up a specific player (from hash/desc results) */
   function lookupByGuid(guid: string) {
     setSearchMode("guid");
-    setGuidInput(guid);
-    setSearchedQuery("");
-    setHwids([]);
-    setDetections([]);
-    setLookupError(null);
+    setModeInputs((prev) => ({ ...prev, guid }));
     setBanError(null);
-    // Trigger the fetch after state settles
-    setTimeout(async () => {
-      setLookupLoading(true);
+    setMode("guid", { loading: true, error: null, hwids: [], detections: [] });
+    void (async () => {
       try {
         const enc = encodeURIComponent(guid);
         const [hwidRes, detRes] = await Promise.all([
@@ -509,18 +523,18 @@ export default function HwidManagerView() {
         ]);
         const hwidBody = await hwidRes.json();
         if (!hwidRes.ok) throw new Error(hwidBody.error || `Error ${hwidRes.status}`);
-        setHwids(hwidBody.hwids as HwidRow[]);
-        setSessionCount(hwidBody.session_count as number);
         const detBody = await detRes.json();
-        if (detRes.ok) setDetections(detBody.records as DetectionRecord[]);
-        setSearchedQuery(guid);
-        setSearchedMode("guid");
+        setMode("guid", {
+          query:        guid,
+          hwids:        hwidBody.hwids as HwidRow[],
+          sessionCount: hwidBody.session_count as number,
+          detections:   detRes.ok ? detBody.records as DetectionRecord[] : [],
+          loading: false,
+        });
       } catch (err) {
-        setLookupError(err instanceof Error ? err.message : "Failed to load.");
-      } finally {
-        setLookupLoading(false);
+        setMode("guid", { loading: false, error: err instanceof Error ? err.message : "Failed to load." });
       }
-    }, 0);
+    })();
   }
 
   /* Execute ban */
@@ -533,28 +547,34 @@ export default function HwidManagerView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: confirmTarget.id,
-          type: confirmTarget.type,
-          hash: confirmTarget.hash,
+          id:          confirmTarget.id,
+          type:        confirmTarget.type,
+          hash:        confirmTarget.hash,
           description: confirmTarget.description ?? undefined,
-          notes: pendingNote.trim() || undefined,
-          // If hash is a known placeholder the user had to acknowledge the risk
-          force: isUnsafeHwid(confirmTarget.hash) ? true : undefined,
+          notes:       pendingNote.trim() || undefined,
+          force:       isUnsafeHwid(confirmTarget.hash) ? true : undefined,
         }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
-
       const newBannedId = body.id as number;
 
-      // Update hwid row in local state
-      setHwids((prev) =>
-        prev.map((h) =>
-          h.type === confirmTarget.type && h.hash === confirmTarget.hash
-            ? { ...h, is_banned: true, banned_hwid_id: newBannedId }
-            : h,
-        ),
-      );
+      // Update the banned row in whichever tab triggered the ban
+      setModeStates((prev) => {
+        const updated: Record<SearchMode, ModeState> = { ...prev };
+        (Object.keys(updated) as SearchMode[]).forEach((mode) => {
+          updated[mode] = {
+            ...updated[mode],
+            hwids: updated[mode].hwids.map((h) =>
+              h.type === confirmTarget.type && h.hash === confirmTarget.hash
+                ? { ...h, is_banned: true, banned_hwid_id: newBannedId }
+                : h,
+            ),
+          };
+        });
+        return updated;
+      });
+
       setConfirmTarget(null);
       setPendingNote("");
       await loadBanned();
@@ -565,7 +585,7 @@ export default function HwidManagerView() {
     }
   }
 
-  /* Unban */
+  /* Unban — update all tabs so the status badge reflects the change everywhere */
   async function unban(id: number) {
     try {
       const res = await fetch(`/api/banned-hwid/${id}`, { method: "DELETE" });
@@ -574,20 +594,28 @@ export default function HwidManagerView() {
         throw new Error(body.error || `Error ${res.status}`);
       }
       setBannedList((prev) => prev.filter((b) => b.id !== id));
-      // Mark row as unbanned in lookup results if visible
-      setHwids((prev) =>
-        prev.map((h) => (h.banned_hwid_id === id ? { ...h, is_banned: false, banned_hwid_id: null } : h)),
-      );
+      setModeStates((prev) => {
+        const updated: Record<SearchMode, ModeState> = { ...prev };
+        (Object.keys(updated) as SearchMode[]).forEach((mode) => {
+          updated[mode] = {
+            ...updated[mode],
+            hwids: updated[mode].hwids.map((h) =>
+              h.banned_hwid_id === id ? { ...h, is_banned: false, banned_hwid_id: null } : h,
+            ),
+          };
+        });
+        return updated;
+      });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Unban failed.");
     }
   }
 
-  // Process lookup results: dedup, detect changes, group into sessions
-  const displayHwids  = deduplicateHwids(hwids);
+  // Process active tab's lookup results
+  const displayHwids  = deduplicateHwids(ms.hwids);
   const changedKeys   = getChangedRowKeys(displayHwids);
   const sessionGroups = groupByLastSeen(displayHwids);
-  const colCount      = searchedMode !== "guid" ? 8 : 7;
+  const colCount      = searchMode !== "guid" ? 8 : 7;
 
   const filteredBanned = bannedList.filter((b) => {
     const q = bannedSearch.toLowerCase();
@@ -625,7 +653,7 @@ export default function HwidManagerView() {
             <button
               key={mode}
               type="button"
-              onClick={() => { setSearchMode(mode); setGuidInput(""); }}
+              onClick={() => setSearchMode(mode)}
               className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                 searchMode === mode
                   ? "bg-[var(--accent)] text-white"
@@ -640,8 +668,8 @@ export default function HwidManagerView() {
         <form onSubmit={lookupPlayer} className="flex gap-2 mb-4">
           <input
             type="text"
-            value={guidInput}
-            onChange={(e) => setGuidInput(e.target.value)}
+            value={modeInputs[searchMode]}
+            onChange={(e) => setModeInputs((prev) => ({ ...prev, [searchMode]: e.target.value }))}
             placeholder={
               searchMode === "guid"        ? "Enter player GUID (e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)" :
               searchMode === "hash"        ? "Enter exact HWID hash…" :
@@ -652,20 +680,17 @@ export default function HwidManagerView() {
           />
           <button
             type="submit"
-            disabled={lookupLoading || !guidInput.trim()}
+            disabled={ms.loading || !modeInputs[searchMode].trim()}
             className="px-5 py-2.5 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:bg-[var(--accent-hover)] disabled:opacity-40"
           >
-            {lookupLoading ? "Looking up…" : "Lookup"}
+            {ms.loading ? "Looking up…" : "Lookup"}
           </button>
-          {(searchedQuery || hwids.length > 0) && (
+          {(ms.query || ms.hwids.length > 0) && (
             <button
               type="button"
               onClick={() => {
-                setGuidInput("");
-                setSearchedQuery("");
-                setHwids([]);
-                setDetections([]);
-                setLookupError(null);
+                setModeInputs((prev) => ({ ...prev, [searchMode]: "" }));
+                setMode(searchMode, emptyModeState());
                 setBanError(null);
               }}
               className="px-4 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-dim)] hover:text-white hover:border-[var(--accent)] transition-colors"
@@ -675,9 +700,9 @@ export default function HwidManagerView() {
           )}
         </form>
 
-        {lookupError && (
+        {ms.error && (
           <div className="text-sm text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/30 rounded-lg px-4 py-3 mb-4">
-            {lookupError}
+            {ms.error}
           </div>
         )}
 
@@ -687,17 +712,17 @@ export default function HwidManagerView() {
           </div>
         )}
 
-        {searchedQuery && !lookupLoading && (
+        {ms.query && !ms.loading && (
           <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
             <div className="px-4 py-2.5 border-b bg-[var(--panel-2)] flex items-center justify-between text-sm">
               <span>
-                <span className="font-mono text-xs text-[var(--text-dim)]">{searchedQuery}</span>
+                <span className="font-mono text-xs text-[var(--text-dim)]">{ms.query}</span>
                 {" — "}
-                <span className="font-medium">{hwids.length}</span> HWID{hwids.length !== 1 ? "s" : ""}
-                {searchedMode === "guid" ? (
-                  <> across <span className="font-medium">{sessionCount}</span> session{sessionCount !== 1 ? "s" : ""}</>
+                <span className="font-medium">{ms.hwids.length}</span> HWID{ms.hwids.length !== 1 ? "s" : ""}
+                {searchMode === "guid" ? (
+                  <> across <span className="font-medium">{ms.sessionCount}</span> session{ms.sessionCount !== 1 ? "s" : ""}</>
                 ) : (
-                  <> across <span className="font-medium">{sessionCount}</span> player{sessionCount !== 1 ? "s" : ""}</>
+                  <> across <span className="font-medium">{ms.sessionCount}</span> player{ms.sessionCount !== 1 ? "s" : ""}</>
                 )}
               </span>
             </div>
@@ -711,7 +736,7 @@ export default function HwidManagerView() {
                 <table className="w-full text-sm">
                   <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
                     <tr>
-                      {searchedMode !== "guid" && (
+                      {searchMode !== "guid" && (
                         <th className="px-4 py-2.5 text-left">Player</th>
                       )}
                       <th className="px-4 py-2.5 text-left">Type</th>
@@ -768,7 +793,7 @@ export default function HwidManagerView() {
                                   : "hover:bg-[var(--panel-2)]/50"
                               }`}
                             >
-                              {searchedMode !== "guid" && (
+                              {searchMode !== "guid" && (
                                 <td className="px-4 py-2.5 min-w-[140px]">
                                   {h.player_guid ? (
                                     <div className="flex flex-col gap-0.5">
@@ -872,18 +897,18 @@ export default function HwidManagerView() {
           </div>
         )}
 
-        {/* Detection Records — GUID mode only */}
-        {searchedQuery && searchedMode === "guid" && !lookupLoading && (
+        {/* Detection Records — GUID tab only */}
+        {ms.query && searchMode === "guid" && !ms.loading && (
           <div className="mt-6 bg-[var(--panel)] border rounded-lg overflow-hidden">
             <div className="px-4 py-2.5 border-b bg-[var(--panel-2)] flex items-center justify-between text-sm">
               <span>
                 Detection Records
                 <span className="ml-2 text-[var(--text-dim)] text-xs">
-                  {detections.length} record{detections.length !== 1 ? "s" : ""}
+                  {ms.detections.length} record{ms.detections.length !== 1 ? "s" : ""}
                 </span>
               </span>
             </div>
-            {detections.length === 0 ? (
+            {ms.detections.length === 0 ? (
               <div className="px-4 py-8 text-center text-[var(--text-dim)] text-sm">
                 No detection records found for this player.
               </div>
@@ -899,7 +924,7 @@ export default function HwidManagerView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {detections.map((d) => (
+                    {ms.detections.map((d) => (
                       <tr key={d.id} className="border-t hover:bg-[var(--panel-2)]/50">
                         <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
                           {fmtDate(d.date)}
