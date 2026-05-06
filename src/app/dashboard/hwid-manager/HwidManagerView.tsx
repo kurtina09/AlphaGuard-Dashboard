@@ -38,6 +38,22 @@ type DetectionRecord = {
   date: string;
 };
 
+/* ── HWID type labels ───────────────────────────────────────── */
+const HWID_TYPE_LABEL: Record<string, string> = {
+  "1": "MAC",
+  "2": "MOBO",
+  "3": "CPU",
+  "4": "DISK",
+  "5": "GPU",
+  "6": "MONITOR",
+  "7": "TPM",
+  "8": "UUID",
+};
+
+function hwidType(type: string): string {
+  return HWID_TYPE_LABEL[type] ?? type;
+}
+
 /* ── Helpers ────────────────────────────────────────────────── */
 function fmtDate(s: string) {
   if (!s) return "—";
@@ -98,7 +114,7 @@ function ConfirmModal({
         <div className="bg-[var(--panel-2)] rounded-md p-3 space-y-2 text-sm mb-4">
           <div className="flex justify-between">
             <span className="text-[var(--text-dim)]">Type</span>
-            <span className="font-mono font-medium">{hwid.type}</span>
+            <span className="font-mono font-medium">{hwidType(hwid.type)}</span>
           </div>
           <div className="flex justify-between gap-4">
             <span className="text-[var(--text-dim)] shrink-0">Hash</span>
@@ -236,7 +252,7 @@ function BannedRow({
       </td>
       <td className="px-4 py-2.5">
         <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--panel-2)] border">
-          {b.type}
+          {hwidType(b.type)}
         </span>
       </td>
       <td className="px-4 py-2.5 max-w-[200px]">
@@ -489,6 +505,7 @@ export default function HwidManagerView() {
       (b.codename ?? "").toLowerCase().includes(q) ||
       (b.player_guid ?? "").toLowerCase().includes(q) ||
       b.type.toLowerCase().includes(q) ||
+      hwidType(b.type).toLowerCase().includes(q) ||
       b.hash.toLowerCase().includes(q) ||
       (b.description ?? "").toLowerCase().includes(q)
     );
@@ -633,7 +650,7 @@ export default function HwidManagerView() {
                         )}
                         <td className="px-4 py-2.5">
                           <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--panel-2)] border">
-                            {h.type}
+                            {hwidType(h.type)}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 max-w-[200px]">
