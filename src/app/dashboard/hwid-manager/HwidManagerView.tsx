@@ -54,6 +54,51 @@ function hwidType(type: string): string {
   return HWID_TYPE_LABEL[type] ?? type;
 }
 
+/* ── HWID deduplication & change detection ──────────────────── */
+
+/**
+ * If two rows share the same hash AND description (across different types),
+ * keep only the one with the most recent last_seen.
+ */
+function deduplicateHwids(hwids: HwidRow[]): HwidRow[] {
+  const map = new Map<string, HwidRow>();
+  for (const h of hwids) {
+    // Scope dedup per player so hash/description searches don't merge different players
+    const key = `${h.player_guid ?? ""}|||${h.hash}|||${h.description ?? ""}`;
+    const existing = map.get(key);
+    if (!existing || new Date(h.last_seen) > new Date(existing.last_seen)) {
+      map.set(key, h);
+    }
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime(),
+  );
+}
+
+/**
+ * Returns a Set of "player|||type|||hash" keys for rows that belong to a
+ * (player, type) group with more than one distinct hash value — meaning the
+ * hardware identifier changed at some point.
+ */
+function getChangedRowKeys(hwids: HwidRow[]): Set<string> {
+  const groups = new Map<string, Set<string>>();
+  for (const h of hwids) {
+    const groupKey = `${h.player_guid ?? ""}|||${h.type}`;
+    if (!groups.has(groupKey)) groups.set(groupKey, new Set());
+    groups.get(groupKey)!.add(h.hash);
+  }
+  const changedKeys = new Set<string>();
+  for (const [groupKey, hashes] of groups) {
+    if (hashes.size > 1) {
+      const [pguid, type] = groupKey.split("|||");
+      for (const hash of hashes) {
+        changedKeys.add(`${pguid}|||${type}|||${hash}`);
+      }
+    }
+  }
+  return changedKeys;
+}
+
 /* ── Helpers ────────────────────────────────────────────────── */
 function fmtDate(s: string) {
   if (!s) return "—";
@@ -498,6 +543,11 @@ export default function HwidManagerView() {
     }
   }
 
+  // Process lookup results: dedup same hash+description, detect changed values
+  const displayHwids  = deduplicateHwids(hwids);
+  const changedKeys   = getChangedRowKeys(displayHwids);
+  const hasAnyChanged = changedKeys.size > 0;
+
   const filteredBanned = bannedList.filter((b) => {
     const q = bannedSearch.toLowerCase();
     if (!q) return true;
@@ -595,7 +645,7 @@ export default function HwidManagerView() {
               </span>
             </div>
 
-            {hwids.length === 0 ? (
+            {displayHwids.length === 0 ? (
               <div className="px-4 py-10 text-center text-[var(--text-dim)] text-sm">
                 No hardware IDs found for this player.
               </div>
@@ -617,89 +667,113 @@ export default function HwidManagerView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {hwids.map((h, i) => (
-                      <tr
-                        key={`${h.type}-${h.hash}-${i}`}
-                        className={`border-t transition-colors ${
-                          h.is_banned
-                            ? "bg-red-950/20 hover:bg-red-950/30"
-                            : "hover:bg-[var(--panel-2)]/50"
-                        }`}
-                      >
-                        {searchedMode !== "guid" && (
-                          <td className="px-4 py-2.5 min-w-[140px]">
-                            {h.player_guid ? (
-                              <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-1">
-                                  <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[110px]" title={h.player_guid}>
-                                    {h.player_guid}
-                                  </span>
-                                  <CopyButton text={h.player_guid} />
+                    {displayHwids.map((h, i) => {
+                      const rowKey  = `${h.player_guid ?? ""}|||${h.type}|||${h.hash}`;
+                      const changed = changedKeys.has(rowKey);
+                      return (
+                        <tr
+                          key={`${h.type}-${h.hash}-${i}`}
+                          className={`border-t transition-colors ${
+                            h.is_banned
+                              ? "bg-red-950/20 hover:bg-red-950/30"
+                              : changed
+                              ? "bg-amber-950/10 hover:bg-amber-950/20"
+                              : "hover:bg-[var(--panel-2)]/50"
+                          }`}
+                        >
+                          {searchedMode !== "guid" && (
+                            <td className="px-4 py-2.5 min-w-[140px]">
+                              {h.player_guid ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[110px]" title={h.player_guid}>
+                                      {h.player_guid}
+                                    </span>
+                                    <CopyButton text={h.player_guid} />
+                                  </div>
+                                  <button
+                                    onClick={() => lookupByGuid(h.player_guid!)}
+                                    className="text-[10px] text-[var(--accent)] hover:underline text-left"
+                                  >
+                                    Full lookup ↗
+                                  </button>
                                 </div>
-                                <button
-                                  onClick={() => lookupByGuid(h.player_guid!)}
-                                  className="text-[10px] text-[var(--accent)] hover:underline text-left"
-                                >
-                                  Full lookup ↗
-                                </button>
-                              </div>
+                              ) : (
+                                <span className="text-xs text-[var(--text-dim)]">—</span>
+                              )}
+                            </td>
+                          )}
+                          <td className="px-4 py-2.5">
+                            <span className={`text-xs font-mono px-2 py-0.5 rounded bg-[var(--panel-2)] border ${
+                              changed ? "border-amber-500/60 text-amber-300" : ""
+                            }`}>
+                              {hwidType(h.type)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 max-w-[200px]">
+                            <div className="flex items-center gap-1">
+                              <span
+                                className={`font-mono text-xs truncate ${changed ? "text-amber-300" : ""}`}
+                                title={changed ? `${hwidType(h.type)} value has changed across sessions` : h.hash}
+                              >
+                                {h.hash}
+                              </span>
+                              {changed && (
+                                <span className="shrink-0 text-[10px] text-amber-400 font-semibold" title="This hardware identifier has a different value in another session">
+                                  ↕
+                                </span>
+                              )}
+                              <CopyButton text={h.hash} />
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] max-w-[160px] truncate">
+                            {h.description ?? "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
+                            {fmtDate(h.created_at)}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
+                            {fmtDate(h.last_seen)}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {h.is_banned ? (
+                              <span className="text-xs px-2 py-0.5 rounded bg-[var(--danger)]/20 text-[var(--danger)] font-medium">
+                                Banned
+                              </span>
                             ) : (
-                              <span className="text-xs text-[var(--text-dim)]">—</span>
+                              <span className="text-xs px-2 py-0.5 rounded bg-green-900/20 text-green-400">
+                                Active
+                              </span>
                             )}
                           </td>
-                        )}
-                        <td className="px-4 py-2.5">
-                          <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--panel-2)] border">
-                            {hwidType(h.type)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 max-w-[200px]">
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono text-xs truncate" title={h.hash}>{h.hash}</span>
-                            <CopyButton text={h.hash} />
-                          </div>
-                        </td>
-                        <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] max-w-[160px] truncate">
-                          {h.description ?? "—"}
-                        </td>
-                        <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
-                          {fmtDate(h.created_at)}
-                        </td>
-                        <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
-                          {fmtDate(h.last_seen)}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {h.is_banned ? (
-                            <span className="text-xs px-2 py-0.5 rounded bg-[var(--danger)]/20 text-[var(--danger)] font-medium">
-                              Banned
-                            </span>
-                          ) : (
-                            <span className="text-xs px-2 py-0.5 rounded bg-green-900/20 text-green-400">
-                              Active
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {h.is_banned ? (
-                            <button
-                              onClick={() => h.banned_hwid_id !== null && unban(h.banned_hwid_id)}
-                              className="text-xs px-3 py-1 rounded border border-[var(--text-dim)]/30 text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
-                            >
-                              Unban
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmTarget(h)}
-                              className="text-xs px-3 py-1 rounded border border-[var(--danger)]/40 text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors"
-                            >
-                              Ban
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="px-4 py-2.5">
+                            {h.is_banned ? (
+                              <button
+                                onClick={() => h.banned_hwid_id !== null && unban(h.banned_hwid_id)}
+                                className="text-xs px-3 py-1 rounded border border-[var(--text-dim)]/30 text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
+                              >
+                                Unban
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmTarget(h)}
+                                className="text-xs px-3 py-1 rounded border border-[var(--danger)]/40 text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors"
+                              >
+                                Ban
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
+                {hasAnyChanged && (
+                  <div className="px-4 py-2 border-t border-[var(--border)] bg-amber-950/10 text-[10px] text-amber-400/80 flex items-center gap-1.5">
+                    <span className="font-semibold">↕</span>
+                    <span>Amber rows indicate a hardware identifier that changed between sessions — possible hardware swap or spoofing.</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
