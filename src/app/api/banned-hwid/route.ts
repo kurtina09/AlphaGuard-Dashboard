@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/session";
 import { getPool } from "@/lib/db";
+import { isUnsafeHwid } from "@/lib/unsafeHwids";
 import type { RowDataPacket } from "mysql2";
 
 const UPSTREAM = process.env.GAME_API_BASE ?? "https://api.sf-alpha.com/v2";
@@ -83,16 +84,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, type, hash, description, notes } = await req.json() as {
+  const { id, type, hash, description, notes, force } = await req.json() as {
     id: number;
     type: string;
     hash: string;
     description?: string;
     notes?: string;
+    force?: boolean;
   };
 
   if (!id || !type || !hash) {
     return NextResponse.json({ error: "id, type and hash are required." }, { status: 400 });
+  }
+
+  // Block banning known placeholder / OEM default values unless admin explicitly forces it
+  if (!force && isUnsafeHwid(hash)) {
+    return NextResponse.json(
+      {
+        error: "unsafe_hwid",
+        message: `"${hash}" is a known placeholder value shared by many devices. Banning it would affect innocent players. Tick the confirmation checkbox to proceed anyway.`,
+      },
+      { status: 422 },
+    );
   }
 
   try {

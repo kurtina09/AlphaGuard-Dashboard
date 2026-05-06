@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { isUnsafeHwid } from "@/lib/unsafeHwids";
 
 /* ── Types ─────────────────────────────────────────────────── */
 type SearchMode = "guid" | "hash" | "description";
@@ -80,6 +81,9 @@ function ConfirmModal({
   onCancel: () => void;
   loading: boolean;
 }) {
+  const unsafe = isUnsafeHwid(hwid.hash);
+  const [unsafeAck, setUnsafeAck] = useState(false);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70">
       <div className="bg-[var(--panel)] border border-[var(--danger)]/50 rounded-lg w-full max-w-md p-6 shadow-xl">
@@ -107,6 +111,35 @@ function ConfirmModal({
             </div>
           )}
         </div>
+
+        {/* ── Unsafe hash warning ── */}
+        {unsafe && (
+          <div className="mb-4 rounded-md border border-yellow-600/50 bg-yellow-900/20 p-3">
+            <div className="flex items-start gap-2">
+              <span className="text-yellow-400 text-base mt-0.5">🚨</span>
+              <div className="text-xs text-yellow-300 space-y-1">
+                <p className="font-semibold">Risky placeholder value detected</p>
+                <p className="text-yellow-300/80">
+                  <span className="font-mono">{hwid.hash}</span> is a known OEM default or placeholder
+                  that may be shared by thousands of devices. Banning it will
+                  flag many innocent players.
+                </p>
+              </div>
+            </div>
+            <label className="mt-3 flex items-start gap-2 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={unsafeAck}
+                onChange={(e) => setUnsafeAck(e.target.checked)}
+                className="mt-0.5 accent-yellow-400 shrink-0"
+              />
+              <span className="text-xs text-yellow-300/80 group-hover:text-yellow-300 leading-snug">
+                I understand this value is shared by many devices and accept the risk of banning innocent players.
+              </span>
+            </label>
+          </div>
+        )}
+
         <div className="mb-5">
           <label className="block text-xs text-[var(--text-dim)] mb-1.5">
             Internal note <span className="opacity-60">(optional — stored only in dashboard, not in the game database)</span>
@@ -129,8 +162,9 @@ function ConfirmModal({
           </button>
           <button
             onClick={onConfirm}
-            disabled={loading}
-            className="flex-1 py-2 rounded-md bg-[var(--danger)] text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+            disabled={loading || (unsafe && !unsafeAck)}
+            title={unsafe && !unsafeAck ? "Tick the checkbox above to proceed" : undefined}
+            className="flex-1 py-2 rounded-md bg-[var(--danger)] text-white text-sm font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? "Banning…" : "Ban This HWID"}
           </button>
@@ -403,6 +437,8 @@ export default function HwidManagerView() {
           hash: confirmTarget.hash,
           description: confirmTarget.description ?? undefined,
           notes: pendingNote.trim() || undefined,
+          // If hash is a known placeholder the user had to acknowledge the risk
+          force: isUnsafeHwid(confirmTarget.hash) ? true : undefined,
         }),
       });
       const body = await res.json();
