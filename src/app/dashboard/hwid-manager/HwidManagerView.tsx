@@ -508,6 +508,31 @@ export default function HwidManagerView() {
     }
   }
 
+  /* Switch to Hash tab and search all players sharing a specific hash */
+  function lookupByHash(hash: string) {
+    setSearchMode("hash");
+    setModeInputs((prev) => ({ ...prev, hash }));
+    setBanError(null);
+    setMode("hash", { loading: true, error: null, hwids: [], detections: [], query: hash, sessionCount: 0 });
+    void (async () => {
+      try {
+        const enc     = encodeURIComponent(hash);
+        const hwidRes = await fetch(`/api/hwid?hash=${enc}`);
+        const hwidBody = await hwidRes.json();
+        if (!hwidRes.ok) throw new Error(hwidBody.error || `Error ${hwidRes.status}`);
+        setMode("hash", {
+          query:        hash,
+          hwids:        hwidBody.hwids as HwidRow[],
+          sessionCount: hwidBody.session_count as number,
+          detections:   [],
+          loading:      false,
+        });
+      } catch (err) {
+        setMode("hash", { loading: false, error: err instanceof Error ? err.message : "Failed to load." });
+      }
+    })();
+  }
+
   /* Switch to GUID tab and look up a specific player (from hash/desc results) */
   function lookupByGuid(guid: string) {
     setSearchMode("guid");
@@ -862,21 +887,30 @@ export default function HwidManagerView() {
                                 )}
                               </td>
                               <td className="px-4 py-2.5">
-                                {h.is_banned ? (
+                                <div className="flex flex-col gap-1">
+                                  {h.is_banned ? (
+                                    <button
+                                      onClick={() => h.banned_hwid_id !== null && unban(h.banned_hwid_id)}
+                                      className="text-xs px-3 py-1 rounded border border-[var(--text-dim)]/30 text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
+                                    >
+                                      Unban
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => setConfirmTarget(h)}
+                                      className="text-xs px-3 py-1 rounded border border-[var(--danger)]/40 text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors"
+                                    >
+                                      Ban
+                                    </button>
+                                  )}
                                   <button
-                                    onClick={() => h.banned_hwid_id !== null && unban(h.banned_hwid_id)}
-                                    className="text-xs px-3 py-1 rounded border border-[var(--text-dim)]/30 text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
+                                    onClick={() => lookupByHash(h.hash)}
+                                    title="Find all players using this exact hash"
+                                    className="text-xs px-3 py-1 rounded border border-sky-500/40 text-sky-400 hover:bg-sky-900/20 transition-colors"
                                   >
-                                    Unban
+                                    Find Dupes
                                   </button>
-                                ) : (
-                                  <button
-                                    onClick={() => setConfirmTarget(h)}
-                                    className="text-xs px-3 py-1 rounded border border-[var(--danger)]/40 text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors"
-                                  >
-                                    Ban
-                                  </button>
-                                )}
+                                </div>
                               </td>
                             </tr>
                           );

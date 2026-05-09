@@ -200,6 +200,10 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
   const [playerLoading, setPlayerLoading] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef<{ mouseX: number; mouseY: number; panX: number; panY: number } | null>(null);
+  const didDragMove = useRef(false);
   const itemsRef = useRef<Item[]>([]);
 
   const load = useCallback(async () => {
@@ -232,6 +236,10 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
     setPlayerInfo(null);
     setPlayerError(null);
     setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setIsDragging(false);
+    dragStart.current = null;
+    didDragMove.current = false;
   }
 
   function openLightbox(item: Item, index: number) {
@@ -271,7 +279,42 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
 
   function handleWheel(e: React.WheelEvent) {
     e.preventDefault();
-    setZoom(z => Math.min(4, Math.max(1, z - e.deltaY * 0.001)));
+    setZoom(z => {
+      const next = Math.min(4, Math.max(1, z - e.deltaY * 0.002));
+      if (next === 1) setPan({ x: 0, y: 0 });
+      return next;
+    });
+  }
+
+  function handleImgMouseDown(e: React.MouseEvent) {
+    if (zoom <= 1) return;
+    e.preventDefault();
+    setIsDragging(true);
+    didDragMove.current = false;
+    dragStart.current = { mouseX: e.clientX, mouseY: e.clientY, panX: pan.x, panY: pan.y };
+  }
+
+  function handleImgMouseMove(e: React.MouseEvent) {
+    if (!dragStart.current) return;
+    const dx = e.clientX - dragStart.current.mouseX;
+    const dy = e.clientY - dragStart.current.mouseY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDragMove.current = true;
+    setPan({ x: dragStart.current.panX + dx, y: dragStart.current.panY + dy });
+  }
+
+  function handleImgMouseUp(e: React.MouseEvent) {
+    dragStart.current = null;
+    setIsDragging(false);
+    // Only treat as click if user didn't drag
+    if (!didDragMove.current) {
+      e.stopPropagation();
+      setZoom(z => {
+        const next = z >= 4 ? 1 : +(z + 0.5).toFixed(2);
+        if (next === 1) setPan({ x: 0, y: 0 });
+        return next;
+      });
+    }
+    didDragMove.current = false;
   }
 
   async function loadPlayerInfo(playerGuid: string) {
@@ -457,7 +500,7 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 border rounded-md overflow-hidden text-xs">
                   <button
-                    onClick={() => setZoom(z => Math.max(1, +(z - 0.25).toFixed(2)))}
+                    onClick={() => { const n = Math.max(1, +(zoom - 0.25).toFixed(2)); setZoom(n); if (n === 1) setPan({ x: 0, y: 0 }); }}
                     disabled={zoom <= 1}
                     className="px-2 py-1 text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)] disabled:opacity-30"
                   >−</button>
@@ -468,7 +511,7 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
                     className="px-2 py-1 text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)] disabled:opacity-30"
                   >+</button>
                   <button
-                    onClick={() => setZoom(1)}
+                    onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
                     disabled={zoom === 1}
                     className="px-2 py-1 text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)] disabled:opacity-30 border-l"
                   >Reset</button>
@@ -492,20 +535,31 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
 
               {/* Image */}
               <div
-                className="flex-1 overflow-auto"
-                style={{ maxHeight: '60vh' }}
+                className="flex-1 overflow-hidden flex items-center justify-center"
+                style={{ maxHeight: '60vh', minHeight: '200px', backgroundColor: 'black' }}
                 onWheel={handleWheel}
+                onMouseMove={handleImgMouseMove}
+                onMouseUp={handleImgMouseUp}
+                onMouseLeave={() => { dragStart.current = null; setIsDragging(false); didDragMove.current = false; }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/api/screenshots/${lightbox.unique_id}${table ? `?table=${table}` : ""}`}
                   alt={`screenshot ${lightbox.unique_id}`}
-                  onClick={() => setZoom(z => z >= 4 ? 1 : +(z + 0.5).toFixed(2))}
+                  draggable={false}
+                  onMouseDown={handleImgMouseDown}
                   style={{
                     display: 'block',
-                    width: `${zoom * 100}%`,
-                    cursor: zoom < 4 ? 'zoom-in' : 'zoom-out',
-                    transition: 'width 0.15s ease',
+                    maxWidth: '100%',
+                    maxHeight: '60vh',
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                    transformOrigin: 'center center',
+                    transition: isDragging ? 'none' : 'transform 0.15s ease',
+                    cursor: zoom > 1
+                      ? (isDragging ? 'grabbing' : 'grab')
+                      : 'zoom-in',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
                   }}
                 />
               </div>
