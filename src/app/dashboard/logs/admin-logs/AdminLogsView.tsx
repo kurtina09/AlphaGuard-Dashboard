@@ -186,8 +186,15 @@ export default function AdminLogsView() {
     if (dateTo)   qs.set("date_to",   new Date(dateTo).toISOString());
     try {
       const res  = await fetch(`/api/admin-logs?${qs}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
+      const text = await res.text();
+      let body: unknown;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 300)}`);
+      }
+      const b = body as { error?: string; items?: unknown[] };
+      if (!res.ok) throw new Error(b.error || `Error ${res.status}`);
       setData(body as PageResponse);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
