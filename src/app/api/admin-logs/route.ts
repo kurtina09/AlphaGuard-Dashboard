@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/session";
 
-const UPSTREAM = process.env.PATCH_API_BASE ?? "https://patch-api.rivalsf.com";
+const UPSTREAM = process.env.PATCH_API_BASE ?? "https://api.sf-alpha.com";
 const upstreamHost = new URL(UPSTREAM).host;
 
 export async function GET(req: Request) {
