@@ -31,18 +31,11 @@ export async function GET(req: Request) {
     const res  = await fetch(upstream.toString(), { headers, cache: "no-store" });
     const text = await res.text();
 
-    // Cloudflare challenge returns HTML
-    if (text.trimStart().startsWith("<") || text.includes("cf-chl") || text.includes("Just a moment")) {
-      return NextResponse.json(
-        { error: "Request blocked by Cloudflare bot protection." },
-        { status: 403 },
-      );
-    }
-
     try {
       return NextResponse.json(JSON.parse(text), { status: res.status });
     } catch {
-      return NextResponse.json({ error: text.slice(0, 500) }, { status: res.status });
+      // Return the raw response (could be HTML error page) so we can debug
+      return NextResponse.json({ error: text.slice(0, 1000) }, { status: res.status });
     }
   } catch (err) {
     return NextResponse.json(
