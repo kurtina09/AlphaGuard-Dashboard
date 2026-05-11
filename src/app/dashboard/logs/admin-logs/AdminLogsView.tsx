@@ -162,7 +162,7 @@ function ExpandedDetail({ item }: { item: LogItem }) {
 
 /* ── Main view ──────────────────────────────────────────────────────────── */
 const PAGE_SIZE  = 50;
-const ADMIN_API  = "https://admin-api.sf-alpha.com/v2";
+const ADMIN_API  = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
 
 export default function AdminLogsView() {
   const [page,          setPage]         = useState(0);
