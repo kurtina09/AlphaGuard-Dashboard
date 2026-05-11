@@ -4,6 +4,7 @@ import { getIronSession, type SessionOptions } from "iron-session";
 export type SessionData = {
   isLoggedIn: boolean;
   token?: string;
+  adminToken?: string;
   userGuid?: string;
   playerGuid?: string;
   username?: string;
