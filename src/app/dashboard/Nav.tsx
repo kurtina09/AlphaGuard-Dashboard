@@ -9,6 +9,13 @@ type Section = { id: string; title: string; links: NavLink[] };
 
 const SECTIONS: Section[] = [
   {
+    id: "logs",
+    title: "Logs",
+    links: [
+      { href: "/dashboard/logs/admin-logs", label: "Admin Logs" },
+    ],
+  },
+  {
     id: "screenshots",
     title: "Screenshots",
     links: [
