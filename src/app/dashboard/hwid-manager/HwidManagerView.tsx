@@ -419,11 +419,31 @@ type ModeState = {
   sessionCount: number;
   loading:      boolean;
   error:        string | null;
+  codenames:    Record<string, string | null>; // player_guid → codename
 };
 
 const emptyModeState = (): ModeState => ({
-  query: "", hwids: [], detections: [], sessionCount: 0, loading: false, error: null,
+  query: "", hwids: [], detections: [], sessionCount: 0, loading: false, error: null, codenames: {},
 });
+
+/* ── Batch codename fetcher ─────────────────────────────────── */
+async function fetchCodenames(guids: string[]): Promise<Record<string, string | null>> {
+  const unique = [...new Set(guids.filter(Boolean))];
+  if (!unique.length) return {};
+  const results = await Promise.all(
+    unique.map(async (guid) => {
+      try {
+        const res = await fetch(`/api/player/${guid}`);
+        if (!res.ok) return [guid, null] as const;
+        const body = await res.json() as { codename?: string | null };
+        return [guid, body.codename ?? null] as const;
+      } catch {
+        return [guid, null] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(results);
+}
 
 /* ── Main Component ─────────────────────────────────────────── */
 export default function HwidManagerView() {
@@ -496,11 +516,21 @@ export default function HwidManagerView() {
         if (detRes.ok) detections = detBody.records as DetectionRecord[];
       }
 
+      const hwids = hwidBody.hwids as HwidRow[];
+
+      // Fetch codenames for hash/description results (multiple players visible)
+      let codenames: Record<string, string | null> = {};
+      if (searchMode !== "guid") {
+        const guids = hwids.map((h) => h.player_guid).filter(Boolean) as string[];
+        codenames = await fetchCodenames(guids);
+      }
+
       setMode(searchMode, {
         query: q,
-        hwids:        hwidBody.hwids as HwidRow[],
+        hwids,
         sessionCount: hwidBody.session_count as number,
         detections,
+        codenames,
         loading: false,
       });
     } catch (err) {
@@ -516,15 +546,19 @@ export default function HwidManagerView() {
     setMode("hash", { loading: true, error: null, hwids: [], detections: [], query: hash, sessionCount: 0 });
     void (async () => {
       try {
-        const enc     = encodeURIComponent(hash);
-        const hwidRes = await fetch(`/api/hwid?hash=${enc}`);
+        const enc      = encodeURIComponent(hash);
+        const hwidRes  = await fetch(`/api/hwid?hash=${enc}`);
         const hwidBody = await hwidRes.json();
         if (!hwidRes.ok) throw new Error(hwidBody.error || `Error ${hwidRes.status}`);
+        const hwids    = hwidBody.hwids as HwidRow[];
+        const guids    = hwids.map((h) => h.player_guid).filter(Boolean) as string[];
+        const codenames = await fetchCodenames(guids);
         setMode("hash", {
           query:        hash,
-          hwids:        hwidBody.hwids as HwidRow[],
+          hwids,
           sessionCount: hwidBody.session_count as number,
           detections:   [],
+          codenames,
           loading:      false,
         });
       } catch (err) {
@@ -819,9 +853,14 @@ export default function HwidManagerView() {
                               }`}
                             >
                               {searchMode !== "guid" && (
-                                <td className="px-4 py-2.5 min-w-[140px]">
+                                <td className="px-4 py-2.5 min-w-[160px]">
                                   {h.player_guid ? (
                                     <div className="flex flex-col gap-0.5">
+                                      {ms.codenames[h.player_guid] && (
+                                        <div className="text-xs font-semibold text-white truncate max-w-[150px]" title={ms.codenames[h.player_guid]!}>
+                                          {ms.codenames[h.player_guid]}
+                                        </div>
+                                      )}
                                       <div className="flex items-center gap-1">
                                         <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[110px]" title={h.player_guid}>
                                           {h.player_guid}
