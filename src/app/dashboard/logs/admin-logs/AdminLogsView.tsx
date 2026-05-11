@@ -161,7 +161,8 @@ function ExpandedDetail({ item }: { item: LogItem }) {
 }
 
 /* ── Main view ──────────────────────────────────────────────────────────── */
-const PAGE_SIZE = 50;
+const PAGE_SIZE  = 50;
+const ADMIN_API  = "https://admin-api.sf-alpha.com/v2";
 
 export default function AdminLogsView() {
   const [page,          setPage]         = useState(0);
@@ -175,8 +176,18 @@ export default function AdminLogsView() {
   const [loading,       setLoading]      = useState(false);
   const [error,         setError]        = useState<string | null>(null);
   const [expandedRows,  setExpandedRows] = useState<Set<number>>(new Set());
+  const [token,         setToken]        = useState<string | null>(null);
+
+  // Fetch session token once on mount so we can call admin-api directly
+  useEffect(() => {
+    fetch("/api/admin-logs")
+      .then((r) => r.json())
+      .then((b: { token?: string }) => { if (b.token) setToken(b.token); })
+      .catch(() => setError("Failed to get session token."));
+  }, []);
 
   const load = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
@@ -185,7 +196,10 @@ export default function AdminLogsView() {
     if (dateFrom) qs.set("date_from", new Date(dateFrom).toISOString());
     if (dateTo)   qs.set("date_to",   new Date(dateTo).toISOString());
     try {
-      const res  = await fetch(`/api/admin-logs?${qs}`);
+      // Call admin-api.sf-alpha.com directly from the browser
+      const res  = await fetch(`${ADMIN_API}/admin/logs?${qs}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const text = await res.text();
       let body: unknown;
       try {
@@ -193,15 +207,15 @@ export default function AdminLogsView() {
       } catch {
         throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 300)}`);
       }
-      const b = body as { error?: string; items?: unknown[] };
-      if (!res.ok) throw new Error(b.error || `Error ${res.status}`);
+      const b = body as { error?: string; message?: string };
+      if (!res.ok) throw new Error(b.error ?? b.message ?? `Error ${res.status}`);
       setData(body as PageResponse);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
       setLoading(false);
     }
-  }, [page, search, action, dateFrom, dateTo]);
+  }, [page, search, action, dateFrom, dateTo, token]);
 
   useEffect(() => { load(); }, [load]);
 
