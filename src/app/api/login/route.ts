@@ -10,16 +10,26 @@ async function loginAdminApi(
   password: string,
 ): Promise<string | null> {
   try {
-    const res = await fetch(`${ADMIN_API_BASE}/auth/login`, {
+    const url = `${ADMIN_API_BASE}/auth/login`;
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password, keep_me_logged_in: false }),
       cache: "no-store",
     });
-    if (!res.ok) return null;
-    const body = await res.json() as { token?: string; access_token?: string };
-    return body.token ?? body.access_token ?? null;
-  } catch {
+    const text = await res.text();
+    if (!res.ok) {
+      console.error(`[admin-api login] ${res.status} from ${url}:`, text.slice(0, 500));
+      return null;
+    }
+    let body: Record<string, unknown>;
+    try { body = JSON.parse(text); } catch { body = {}; }
+    console.log("[admin-api login] response keys:", Object.keys(body));
+    const token = (body.token ?? body.access_token ?? null) as string | null;
+    if (!token) console.error("[admin-api login] no token field in response:", text.slice(0, 300));
+    return token;
+  } catch (e) {
+    console.error("[admin-api login] fetch error:", e);
     return null;
   }
 }
