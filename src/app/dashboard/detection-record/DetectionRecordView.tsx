@@ -171,6 +171,7 @@ export default function DetectionRecordView() {
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--panel-2)]">
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider whitespace-nowrap">Date (PHT)</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">Codename</th>
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">Player GUID</th>
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider w-36">Action</th>
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">Description</th>
@@ -179,12 +180,12 @@ export default function DetectionRecordView() {
             <tbody>
               {loading && records.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="text-center py-12 text-[var(--text-dim)]">Loading…</td>
+                  <td colSpan={5} className="text-center py-12 text-[var(--text-dim)]">Loading…</td>
                 </tr>
               )}
               {!loading && records.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="text-center py-12 text-[var(--text-dim)]">No records found.</td>
+                  <td colSpan={5} className="text-center py-12 text-[var(--text-dim)]">No records found.</td>
                 </tr>
               )}
               {records.map((rec) => (
@@ -192,12 +193,12 @@ export default function DetectionRecordView() {
                   <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap font-mono">
                     {fmt(rec.date)}
                   </td>
+                  <td className="px-4 py-2.5 text-sm font-semibold text-white whitespace-nowrap">
+                    {codenames[rec.player_guid]
+                      ? codenames[rec.player_guid]
+                      : <span className="text-[var(--text-dim)] font-normal italic text-xs">—</span>}
+                  </td>
                   <td className="px-4 py-2.5">
-                    {codenames[rec.player_guid] && (
-                      <div className="text-xs font-semibold text-white truncate max-w-[220px] mb-0.5">
-                        {codenames[rec.player_guid]}
-                      </div>
-                    )}
                     <div className="flex items-center font-mono text-xs">
                       <span className="truncate max-w-[220px]" title={rec.player_guid}>
                         {rec.player_guid}
