@@ -39,20 +39,22 @@ export async function GET(
 
   const token = session.token!;
 
-  const playerInfo = await apiFetch(`/player/${guid}`, token);
+  // Try /player/{guid} first, fall back to /users/{guid}
+  let info = await apiFetch(`/player/${guid}`, token);
+  if (!info) info = await apiFetch(`/users/${guid}`, token);
 
-  if (!playerInfo) {
+  if (!info) {
     return NextResponse.json({ error: "Player not found." }, { status: 404 });
   }
 
   return NextResponse.json({
     player_guid: guid,
-    codename: playerInfo.codename ?? null,
-    rank_num: playerInfo.rank_num ?? null,
-    rank_exp: playerInfo.rank_exp ?? null,
-    kills: playerInfo.kills ?? null,
-    kill_death_ratio: playerInfo.kill_death_ratio ?? null,
-    matches_played: playerInfo.matches_played ?? null,
-    win_ratio: playerInfo.win_ratio ?? null,
+    codename: info.codename ?? null,
+    rank_num: info.rank_num ?? null,
+    rank_exp: info.rank_exp ?? null,
+    kills: info.kills ?? null,
+    kill_death_ratio: info.kill_death_ratio ?? null,
+    matches_played: info.matches_played ?? null,
+    win_ratio: info.win_ratio ?? null,
   });
 }
