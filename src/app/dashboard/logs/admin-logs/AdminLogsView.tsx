@@ -363,7 +363,6 @@ export default function AdminLogsView() {
                   <th className="px-4 py-2.5 text-left whitespace-nowrap">Date</th>
                   <th className="px-4 py-2.5 text-left">Action</th>
                   <th className="px-4 py-2.5 text-left whitespace-nowrap">Object Type</th>
-                  <th className="px-4 py-2.5 text-left whitespace-nowrap">Object GUID</th>
                   <th className="px-4 py-2.5 text-left">Staff</th>
                   <th className="px-4 py-2.5 text-left">Message</th>
                 </tr>
@@ -415,20 +414,6 @@ export default function AdminLogsView() {
                           {objType}
                         </td>
 
-                        {/* Object GUID */}
-                        <td className="px-4 py-2.5">
-                          {objGuid !== "—" ? (
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[120px]" title={objGuid}>
-                                {objGuid}
-                              </span>
-                              <CopyButton text={objGuid} />
-                            </div>
-                          ) : (
-                            <span className="text-xs text-[var(--text-dim)]">—</span>
-                          )}
-                        </td>
-
                         {/* Staff */}
                         <td className="px-4 py-2.5">
                           {userVal !== "—" ? (
@@ -454,7 +439,7 @@ export default function AdminLogsView() {
                       {/* Expanded detail */}
                       {isExpanded && (
                         <tr key={`exp-${idx}`} className="border-t-0">
-                          <td colSpan={7} className="p-0">
+                          <td colSpan={6} className="p-0">
                             <ExpandedDetail item={item} />
                           </td>
                         </tr>
