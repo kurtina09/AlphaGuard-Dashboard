@@ -51,15 +51,35 @@ interface PageData {
   last: boolean;
 }
 
+// ── Codename fetcher ──────────────────────────────────────────────────────────
+async function fetchCodenames(guids: string[]): Promise<Record<string, string | null>> {
+  const unique = [...new Set(guids.filter(Boolean))];
+  if (!unique.length) return {};
+  const results = await Promise.all(
+    unique.map(async (guid) => {
+      try {
+        const res = await fetch(`/api/player/${guid}`);
+        if (!res.ok) return [guid, null] as const;
+        const body = await res.json() as { codename?: string | null };
+        return [guid, body.codename ?? null] as const;
+      } catch {
+        return [guid, null] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(results);
+}
+
 // ── Main view ─────────────────────────────────────────────────────────────────
 export default function DetectionRecordView() {
-  const [data, setData]       = useState<PageData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [data, setData]           = useState<PageData | null>(null);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [codenames, setCodenames] = useState<Record<string, string | null>>({});
   const [guidFilter, setGuidFilter] = useState("");
-  const [page, setPage]       = useState(0);
-  const PAGE_SIZE             = 100;
-  const debounceRef           = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [page, setPage]           = useState(0);
+  const PAGE_SIZE                 = 100;
+  const debounceRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = useCallback(async (pg: number, guid: string) => {
     setLoading(true);
@@ -71,6 +91,9 @@ export default function DetectionRecordView() {
       const body = await res.json() as PageData & { error?: string };
       if (!res.ok) throw new Error(body.error ?? "Request failed");
       setData(body);
+      // Batch-fetch codenames for all GUIDs on this page
+      const guids = (body.records ?? []).map((r) => r.player_guid);
+      fetchCodenames(guids).then(setCodenames).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -170,6 +193,11 @@ export default function DetectionRecordView() {
                     {fmt(rec.date)}
                   </td>
                   <td className="px-4 py-2.5">
+                    {codenames[rec.player_guid] && (
+                      <div className="text-xs font-semibold text-white truncate max-w-[220px] mb-0.5">
+                        {codenames[rec.player_guid]}
+                      </div>
+                    )}
                     <div className="flex items-center font-mono text-xs">
                       <span className="truncate max-w-[220px]" title={rec.player_guid}>
                         {rec.player_guid}
