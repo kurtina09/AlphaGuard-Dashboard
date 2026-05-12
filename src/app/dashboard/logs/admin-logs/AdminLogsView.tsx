@@ -370,12 +370,14 @@ export default function AdminLogsView() {
               </thead>
               <tbody>
                 {data.items.map((item, idx) => {
-                  const date       = pick(item, "date", "created_at", "createdAt", "timestamp", "Date");
+                  const date       = pick(item, "date_added", "date", "created_at", "createdAt", "timestamp", "Date");
                   const actionVal  = pick(item, "action", "Action", "action_type", "actionType");
                   const objType    = pick(item, "object_type", "objectType", "ObjectType");
-                  const objGuid    = pick(item, "object_guid", "objectGuid", "ObjectGuid");
-                  const userVal    = pick(item, "user", "user_guid", "userGuid", "User", "staff", "admin");
-                  const message    = pick(item, "message", "Message", "description", "Description", "details");
+                  const objGuid    = pick(item, "guid", "object_guid", "objectGuid", "ObjectGuid");
+                  const codename   = pick(item, "admin_codename", "adminCodename");
+                  const username   = pick(item, "admin_username", "adminUsername");
+                  const userVal    = codename !== "—" ? codename : username !== "—" ? username : pick(item, "user", "user_guid", "userGuid", "User", "staff", "admin");
+                  const message    = pick(item, "logs", "message", "Message", "description", "Description", "details");
                   const isExpanded = expandedRows.has(idx);
 
                   return (
