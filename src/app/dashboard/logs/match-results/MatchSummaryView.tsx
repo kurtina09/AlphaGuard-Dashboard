@@ -76,13 +76,14 @@ const WORKER_API = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
 
 /* ── Main view ──────────────────────────────────────────────────────────── */
 export default function MatchSummaryView() {
-  const [groupBy,   setGroupBy]  = useState<GroupBy>("codename");
-  const [fromDate,  setFromDate] = useState("");
-  const [toDate,    setToDate]   = useState("");
-  const [data,      setData]     = useState<SummaryItem[] | null>(null);
-  const [loading,   setLoading]  = useState(false);
-  const [error,     setError]    = useState<string | null>(null);
-  const [token,     setToken]    = useState<string | null>(null);
+  const [groupBy,        setGroupBy]       = useState<GroupBy>("codename");
+  const [fromDate,       setFromDate]      = useState("");
+  const [toDate,         setToDate]        = useState("");
+  const [codenameSearch, setCodenameSearch]= useState("");
+  const [data,           setData]          = useState<SummaryItem[] | null>(null);
+  const [loading,        setLoading]       = useState(false);
+  const [error,          setError]         = useState<string | null>(null);
+  const [token,          setToken]         = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/admin-logs")
@@ -124,10 +125,23 @@ export default function MatchSummaryView() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Client-side filtered rows (only applied for codename grouping)
+  const filteredData = data
+    ? groupBy === "codename" && codenameSearch.trim()
+      ? data.filter((item) => {
+          const cn = pick(item, "codename", "Codename", "player_codename").toLowerCase();
+          const pg = pick(item, "player_guid", "playerGuid", "user_guid").toLowerCase();
+          const q  = codenameSearch.trim().toLowerCase();
+          return cn.includes(q) || pg.includes(q);
+        })
+      : data
+    : null;
+
   function reset() {
     setFromDate("");
     setToDate("");
     setGroupBy("codename");
+    setCodenameSearch("");
   }
 
   return (
@@ -149,6 +163,20 @@ export default function MatchSummaryView() {
               <option value="day">Day (per day)</option>
             </select>
           </div>
+
+          {/* Codename search — only shown when group_by=codename */}
+          {groupBy === "codename" && (
+            <div className="flex flex-col gap-1 min-w-[180px]">
+              <label className="text-xs text-[var(--text-dim)]">Search Codename</label>
+              <input
+                type="text"
+                value={codenameSearch}
+                onChange={(e) => setCodenameSearch(e.target.value)}
+                placeholder="Filter by codename or GUID…"
+                className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+          )}
 
           {/* From */}
           <div className="flex flex-col gap-1">
@@ -174,9 +202,16 @@ export default function MatchSummaryView() {
           </button>
         </div>
 
-        {data && !loading && (
+        {filteredData && !loading && (
           <div className="mt-2 text-xs text-[var(--text-dim)] px-1">
-            {data.length.toLocaleString()} group{data.length !== 1 ? "s" : ""} · grouped by <span className="text-white font-medium">{groupBy}</span>
+            {filteredData.length.toLocaleString()}
+            {data && filteredData.length !== data.length && (
+              <span className="text-[var(--text-dim)]"> of {data.length.toLocaleString()}</span>
+            )}
+            {" "}group{filteredData.length !== 1 ? "s" : ""} · grouped by <span className="text-white font-medium">{groupBy}</span>
+            {codenameSearch.trim() && (
+              <span className="ml-2 text-[var(--accent)]">· filtered by &ldquo;{codenameSearch.trim()}&rdquo;</span>
+            )}
           </div>
         )}
       </div>
@@ -188,12 +223,16 @@ export default function MatchSummaryView() {
       {!loading && error && (
         <div className="bg-[var(--panel)] border rounded-lg p-6 text-[var(--danger)]">{error}</div>
       )}
-      {!loading && !error && data && data.length === 0 && (
-        <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">No summary data found.</div>
+      {!loading && !error && filteredData && filteredData.length === 0 && (
+        <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">
+          {codenameSearch.trim() && data && data.length > 0
+            ? `No players matching "${codenameSearch.trim()}".`
+            : "No summary data found."}
+        </div>
       )}
 
       {/* ── Table: per codename (leaderboard) ── */}
-      {!loading && !error && data && data.length > 0 && groupBy === "codename" && (
+      {!loading && !error && filteredData && filteredData.length > 0 && groupBy === "codename" && (
         <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -211,7 +250,7 @@ export default function MatchSummaryView() {
                 </tr>
               </thead>
               <tbody>
-                {data.map((item, idx) => {
+                {filteredData.map((item, idx) => {
                   const codename = pick(item, "codename", "Codename", "player_codename");
                   const pguid    = pick(item, "player_guid", "playerGuid", "user_guid");
                   const matches  = getNum(item, "match_count", "matches", "total_matches", "count");
@@ -266,7 +305,7 @@ export default function MatchSummaryView() {
       )}
 
       {/* ── Table: per mode ── */}
-      {!loading && !error && data && data.length > 0 && groupBy === "mode" && (
+      {!loading && !error && filteredData && filteredData.length > 0 && groupBy === "mode" && (
         <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -283,7 +322,7 @@ export default function MatchSummaryView() {
                 </tr>
               </thead>
               <tbody>
-                {data.map((item, idx) => {
+                {filteredData.map((item, idx) => {
                   const modeVal = pick(item, "mode", "Mode", "game_mode");
                   const matches = getNum(item, "match_count", "matches", "total_matches", "count");
                   const exp     = getNum(item, "total_experience", "total_exp", "experience");
@@ -317,7 +356,7 @@ export default function MatchSummaryView() {
       )}
 
       {/* ── Table: per day ── */}
-      {!loading && !error && data && data.length > 0 && groupBy === "day" && (
+      {!loading && !error && filteredData && filteredData.length > 0 && groupBy === "day" && (
         <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -334,7 +373,7 @@ export default function MatchSummaryView() {
                 </tr>
               </thead>
               <tbody>
-                {data.map((item, idx) => {
+                {filteredData.map((item, idx) => {
                   const dayVal  = pick(item, "day", "date", "date_added", "Day");
                   const matches = getNum(item, "match_count", "matches", "total_matches", "count");
                   const exp     = getNum(item, "total_experience", "total_exp", "experience");
