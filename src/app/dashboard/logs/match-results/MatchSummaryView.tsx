@@ -18,10 +18,11 @@ function fmtDate(s: string | null | undefined) {
 
 function fmtDay(s: string | null | undefined) {
   if (!s) return "—";
-  // Try to format as a readable date — may be ISO date string like "2026-05-12"
   const d = new Date(s.includes("T") ? s : s + "T00:00:00");
   if (isNaN(d.getTime())) return String(s);
-  return d.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", year: "numeric", month: "short", day: "numeric", weekday: "short" });
+  return d.toLocaleDateString("en-PH", {
+    timeZone: "Asia/Manila", year: "numeric", month: "short", day: "numeric", weekday: "short",
+  });
 }
 
 function pick(item: SummaryItem, ...keys: string[]): string {
@@ -71,22 +72,68 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/* ── Debug panel: shows raw first item so we can see actual field names ── */
+function DebugFirstItem({ item }: { item: SummaryItem }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="px-4 py-2 border-b border-amber-700/30 bg-amber-900/10 text-xs flex flex-col gap-1">
+      <button onClick={() => setOpen((v) => !v)}
+        className="text-left text-amber-400/80 hover:text-amber-300 flex items-center gap-1">
+        <span>{open ? "▾" : "▸"}</span>
+        <span className="font-mono">debug: first row field names</span>
+      </button>
+      {open && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-1 mt-1">
+          {Object.entries(item).map(([k, v]) => (
+            <div key={k} className="flex flex-col">
+              <span className="text-amber-400/70 font-mono">{k}</span>
+              <span className="text-white/50 font-mono truncate">{v === null ? "null" : typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Expandable row detail ───────────────────────────────────────────────── */
+function ExpandedDetail({ item, colSpan }: { item: SummaryItem; colSpan: number }) {
+  const entries = Object.entries(item).filter(([, v]) => v !== null && v !== "");
+  return (
+    <tr>
+      <td colSpan={colSpan} className="p-0">
+        <div className="px-4 py-3 bg-[var(--panel-2)]/60 border-t border-[var(--border)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+          {entries.map(([key, value]) => (
+            <div key={key} className="flex flex-col">
+              <span className="text-[10px] text-[var(--text-dim)] uppercase tracking-wide">{key}</span>
+              <div className="flex items-center gap-1 min-w-0">
+                <span className="text-xs font-mono break-all text-white/80">
+                  {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                </span>
+                {typeof value === "string" && value.length > 4 && <CopyButton text={String(value)} />}
+              </div>
+            </div>
+          ))}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 /* ── Constants ───────────────────────────────────────────────────────────── */
 const WORKER_API = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
 
 /* ── Main view ──────────────────────────────────────────────────────────── */
 export default function MatchSummaryView() {
-  const [groupBy,        setGroupBy]       = useState<GroupBy>("codename");
-  const [fromDate,       setFromDate]      = useState("");
-  const [toDate,         setToDate]        = useState("");
-  const [codenameSearch, setCodenameSearch]= useState("");
-  const [data,           setData]          = useState<SummaryItem[] | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [rawBody,        setRawBody]       = useState<any>(null);
-  const [loading,        setLoading]       = useState(false);
-  const [error,          setError]         = useState<string | null>(null);
-  const [token,          setToken]         = useState<string | null>(null);
-  const [showRaw,        setShowRaw]       = useState(false);
+  const [groupBy,        setGroupBy]        = useState<GroupBy>("codename");
+  const [fromDate,       setFromDate]       = useState("");
+  const [toDate,         setToDate]         = useState("");
+  const [codenameSearch, setCodenameSearch] = useState("");
+  const [data,           setData]           = useState<SummaryItem[] | null>(null);
+  const [loading,        setLoading]        = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+  const [token,          setToken]          = useState<string | null>(null);
+  const [expandedRows,   setExpandedRows]   = useState<Set<number>>(new Set());
 
   useEffect(() => {
     fetch("/api/admin-logs")
@@ -99,6 +146,7 @@ export default function MatchSummaryView() {
     if (!token) return;
     setLoading(true);
     setError(null);
+    setExpandedRows(new Set());
     const qs = new URLSearchParams({ group_by: groupBy });
     if (fromDate) qs.set("from_date", new Date(fromDate).toISOString());
     if (toDate)   qs.set("to_date",   new Date(toDate).toISOString());
@@ -115,9 +163,6 @@ export default function MatchSummaryView() {
       const b = body as { error?: string; message?: string };
       if (!res.ok) throw new Error(b.error ?? b.message ?? `Error ${res.status}`);
 
-      setRawBody(body);
-
-      // Handle plain array or any wrapped shape
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const anyBody = body as any;
       const items: SummaryItem[] = Array.isArray(body)
@@ -128,7 +173,6 @@ export default function MatchSummaryView() {
         : Array.isArray(anyBody.results) ? anyBody.results
         : Array.isArray(anyBody.records) ? anyBody.records
         : typeof anyBody === "object" && anyBody !== null
-          // last resort: grab the first array-valued key
           ? (Object.values(anyBody).find((v) => Array.isArray(v)) as SummaryItem[] ?? [])
           : [];
       setData(items);
@@ -141,24 +185,37 @@ export default function MatchSummaryView() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Client-side filtered rows (only applied for codename grouping)
+  function toggleRow(idx: number) {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      next.has(idx) ? next.delete(idx) : next.add(idx);
+      return next;
+    });
+  }
+
+  // Client-side search (codename mode only)
   const filteredData = data
     ? groupBy === "codename" && codenameSearch.trim()
       ? data.filter((item) => {
-          const cn = pick(item, "codename", "Codename", "player_codename").toLowerCase();
-          const pg = pick(item, "player_guid", "playerGuid", "user_guid").toLowerCase();
-          const q  = codenameSearch.trim().toLowerCase();
-          return cn.includes(q) || pg.includes(q);
+          const q = codenameSearch.trim().toLowerCase();
+          return Object.values(item).some((v) =>
+            typeof v === "string" && v.toLowerCase().includes(q)
+          );
         })
       : data
     : null;
 
   function reset() {
-    setFromDate("");
-    setToDate("");
-    setGroupBy("codename");
-    setCodenameSearch("");
+    setFromDate(""); setToDate(""); setGroupBy("codename"); setCodenameSearch("");
   }
+
+  // ── shared stat field name lists (wide net across naming conventions) ──
+  const MATCH_KEYS = ["match_count","matchCount","matches","total_matches","totalMatches","count","total","num_matches","numMatches"];
+  const EXP_KEYS   = ["total_experience","totalExperience","total_exp","totalExp","experience","exp","xp","total_xp","totalXp"];
+  const SP_KEYS    = ["total_sp","totalSp","sp","total_skill_points","totalSkillPoints"];
+  const KILL_KEYS  = ["total_kills","totalKills","kills","kill_count","killCount"];
+  const DEATH_KEYS = ["total_deaths","totalDeaths","deaths","death_count","deathCount"];
+  const HS_KEYS    = ["total_headshots","totalHeadshots","headshots","hs","headshot_count","headshotCount"];
 
   return (
     <>
@@ -170,9 +227,9 @@ export default function MatchSummaryView() {
         <div className="flex flex-wrap gap-3 items-end bg-[var(--panel)] border rounded-lg p-4">
 
           {/* Group By */}
-          <div className="flex flex-col gap-1 w-40">
+          <div className="flex flex-col gap-1 w-44">
             <label className="text-xs text-[var(--text-dim)]">Group By <span className="text-red-400">*</span></label>
-            <select value={groupBy} onChange={(e) => { setGroupBy(e.target.value as GroupBy); }}
+            <select value={groupBy} onChange={(e) => { setGroupBy(e.target.value as GroupBy); setExpandedRows(new Set()); }}
               className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]">
               <option value="codename">Codename (per player)</option>
               <option value="mode">Mode (per game mode)</option>
@@ -184,13 +241,9 @@ export default function MatchSummaryView() {
           {groupBy === "codename" && (
             <div className="flex flex-col gap-1 min-w-[180px]">
               <label className="text-xs text-[var(--text-dim)]">Search Codename</label>
-              <input
-                type="text"
-                value={codenameSearch}
-                onChange={(e) => setCodenameSearch(e.target.value)}
+              <input type="text" value={codenameSearch} onChange={(e) => setCodenameSearch(e.target.value)}
                 placeholder="Filter by codename or GUID…"
-                className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
-              />
+                className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]" />
             </div>
           )}
 
@@ -222,9 +275,10 @@ export default function MatchSummaryView() {
           <div className="mt-2 text-xs text-[var(--text-dim)] px-1">
             {filteredData.length.toLocaleString()}
             {data && filteredData.length !== data.length && (
-              <span className="text-[var(--text-dim)]"> of {data.length.toLocaleString()}</span>
+              <span> of {data.length.toLocaleString()}</span>
             )}
-            {" "}group{filteredData.length !== 1 ? "s" : ""} · grouped by <span className="text-white font-medium">{groupBy}</span>
+            {" "}group{filteredData.length !== 1 ? "s" : ""} · grouped by{" "}
+            <span className="text-white font-medium">{groupBy}</span>
             {codenameSearch.trim() && (
               <span className="ml-2 text-[var(--accent)]">· filtered by &ldquo;{codenameSearch.trim()}&rdquo;</span>
             )}
@@ -240,204 +294,229 @@ export default function MatchSummaryView() {
         <div className="bg-[var(--panel)] border rounded-lg p-6 text-[var(--danger)]">{error}</div>
       )}
       {!loading && !error && filteredData && filteredData.length === 0 && (
-        <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
-          <div className="p-10 text-center text-[var(--text-dim)]">
-            {codenameSearch.trim() && data && data.length > 0
-              ? `No players matching "${codenameSearch.trim()}".`
-              : "No summary data found."}
-          </div>
-          {rawBody !== null && (
-            <div className="border-t border-[var(--border)] px-4 pb-4">
-              <button
-                onClick={() => setShowRaw((v) => !v)}
-                className="mt-3 text-xs text-[var(--text-dim)] hover:text-white underline"
-              >
-                {showRaw ? "Hide" : "Show"} raw API response (debug)
-              </button>
-              {showRaw && (
-                <pre className="mt-2 p-3 bg-[var(--panel-2)] rounded text-[10px] font-mono text-white/70 overflow-x-auto max-h-64 whitespace-pre-wrap break-all">
-                  {JSON.stringify(rawBody, null, 2)}
-                </pre>
-              )}
-            </div>
-          )}
+        <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">
+          {codenameSearch.trim() && data && data.length > 0
+            ? `No players matching "${codenameSearch.trim()}".`
+            : "No summary data found."}
         </div>
       )}
 
       {/* ── Table: per codename (leaderboard) ── */}
-      {!loading && !error && filteredData && filteredData.length > 0 && groupBy === "codename" && (
-        <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
-                <tr>
-                  <th className="px-4 py-2.5 text-center w-10">#</th>
-                  <th className="px-4 py-2.5 text-left">Player</th>
-                  <th className="px-4 py-2.5 text-right">Matches</th>
-                  <th className="px-4 py-2.5 text-right">Total EXP</th>
-                  <th className="px-4 py-2.5 text-right">Total SP</th>
-                  <th className="px-4 py-2.5 text-right">Kills</th>
-                  <th className="px-4 py-2.5 text-right">Deaths</th>
-                  <th className="px-4 py-2.5 text-right">HS</th>
-                  <th className="px-4 py-2.5 text-right">K/D</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredData.map((item, idx) => {
-                  const codename = pick(item, "codename", "Codename", "player_codename");
-                  const pguid    = pick(item, "player_guid", "playerGuid", "user_guid");
-                  const matches  = getNum(item, "match_count", "matches", "total_matches", "count");
-                  const exp      = getNum(item, "total_experience", "total_exp", "experience", "exp");
-                  const sp       = getNum(item, "total_sp", "sp");
-                  const kills    = getNum(item, "total_kills", "kills");
-                  const deaths   = getNum(item, "total_deaths", "deaths");
-                  const hs       = getNum(item, "total_headshots", "headshots", "hs");
-                  const kdVal    = kd(kills, deaths);
+      {!loading && !error && filteredData && filteredData.length > 0 && groupBy === "codename" && (() => {
+        const COLS = 10; // expand toggle + # + player + matches + exp + sp + kills + deaths + hs + k/d
+        return (
+          <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
+            {/* debug strip — always visible, expand to see field names */}
+            <DebugFirstItem item={filteredData[0]} />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
+                  <tr>
+                    <th className="px-4 py-2.5 w-8"></th>
+                    <th className="px-4 py-2.5 text-center w-10">#</th>
+                    <th className="px-4 py-2.5 text-left">Player</th>
+                    <th className="px-4 py-2.5 text-right">Matches</th>
+                    <th className="px-4 py-2.5 text-right">Total EXP</th>
+                    <th className="px-4 py-2.5 text-right">Total SP</th>
+                    <th className="px-4 py-2.5 text-right">Kills</th>
+                    <th className="px-4 py-2.5 text-right">Deaths</th>
+                    <th className="px-4 py-2.5 text-right">HS</th>
+                    <th className="px-4 py-2.5 text-right">K/D</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.map((item, idx) => {
+                    const codename = pick(item,
+                      "codename","Codename","player_codename","playerCodename",
+                      "username","userName","name","player_name","playerName","nickname");
+                    const pguid   = pick(item,
+                      "player_guid","playerGuid","user_guid","userGuid","guid","playerId","player_id");
+                    const matches = getNum(item, ...MATCH_KEYS);
+                    const exp     = getNum(item, ...EXP_KEYS);
+                    const sp      = getNum(item, ...SP_KEYS);
+                    const kills   = getNum(item, ...KILL_KEYS);
+                    const deaths  = getNum(item, ...DEATH_KEYS);
+                    const hs      = getNum(item, ...HS_KEYS);
+                    const kdVal   = kd(kills, deaths);
+                    const isExp   = expandedRows.has(idx);
 
-                  return (
-                    <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
-                      <td className="px-4 py-2.5 text-center text-xs text-[var(--text-dim)]">
-                        {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex flex-col gap-0.5">
-                          {codename !== "—" && (
-                            <span className="text-sm font-semibold text-white">{codename}</span>
-                          )}
-                          {pguid !== "—" && (
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[140px]" title={pguid}>
-                                {pguid}
-                              </span>
-                              <CopyButton text={pguid} />
+                    return (
+                      <>
+                        <tr key={`r-${idx}`} onClick={() => toggleRow(idx)}
+                          className={`border-t border-[var(--border)]/40 cursor-pointer transition-colors ${isExp ? "bg-[var(--panel-2)]" : "hover:bg-[var(--panel-2)]/50"}`}>
+                          <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] text-center select-none">
+                            {isExp ? "▾" : "▸"}
+                          </td>
+                          <td className="px-4 py-2.5 text-center text-xs text-[var(--text-dim)]">
+                            {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex flex-col gap-0.5">
+                              {codename !== "—"
+                                ? <span className="text-sm font-semibold text-white">{codename}</span>
+                                : <span className="text-xs italic text-[var(--text-dim)]">unknown</span>}
+                              {pguid !== "—" && (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[140px]" title={pguid}>{pguid}</span>
+                                  <CopyButton text={pguid} />
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {codename === "—" && pguid === "—" && (
-                            <span className="text-xs text-[var(--text-dim)]">—</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(matches)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-amber-400 font-semibold">{fmt(exp)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(sp)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-emerald-400">{fmt(kills)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-red-400">{fmt(deaths)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-blue-400">{fmt(hs)}</td>
-                      <td className={`px-4 py-2.5 text-xs text-right font-mono font-semibold ${
-                        kdVal === "∞" || Number(kdVal) >= 3 ? "text-amber-400" :
-                        Number(kdVal) >= 1.5 ? "text-emerald-400" :
-                        Number(kdVal) >= 1 ? "text-white" : "text-red-400"
-                      }`}>{kdVal}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(matches)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-amber-400 font-semibold">{fmt(exp)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(sp)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-emerald-400">{fmt(kills)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-red-400">{fmt(deaths)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-blue-400">{fmt(hs)}</td>
+                          <td className={`px-4 py-2.5 text-xs text-right font-mono font-semibold ${
+                            kdVal === "∞" || Number(kdVal) >= 3 ? "text-amber-400" :
+                            Number(kdVal) >= 1.5 ? "text-emerald-400" :
+                            Number(kdVal) >= 1   ? "text-white"      : "text-red-400"
+                          }`}>{kdVal}</td>
+                        </tr>
+                        {isExp && <ExpandedDetail key={`e-${idx}`} item={item} colSpan={COLS} />}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Table: per mode ── */}
-      {!loading && !error && filteredData && filteredData.length > 0 && groupBy === "mode" && (
-        <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
-                <tr>
-                  <th className="px-4 py-2.5 text-left">Mode</th>
-                  <th className="px-4 py-2.5 text-right">Matches</th>
-                  <th className="px-4 py-2.5 text-right">Total EXP</th>
-                  <th className="px-4 py-2.5 text-right">Total SP</th>
-                  <th className="px-4 py-2.5 text-right">Kills</th>
-                  <th className="px-4 py-2.5 text-right">Deaths</th>
-                  <th className="px-4 py-2.5 text-right">HS</th>
-                  <th className="px-4 py-2.5 text-right">K/D</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredData.map((item, idx) => {
-                  const modeVal = pick(item, "mode", "Mode", "game_mode");
-                  const matches = getNum(item, "match_count", "matches", "total_matches", "count");
-                  const exp     = getNum(item, "total_experience", "total_exp", "experience");
-                  const sp      = getNum(item, "total_sp", "sp");
-                  const kills   = getNum(item, "total_kills", "kills");
-                  const deaths  = getNum(item, "total_deaths", "deaths");
-                  const hs      = getNum(item, "total_headshots", "headshots", "hs");
-                  const kdVal   = kd(kills, deaths);
+      {!loading && !error && filteredData && filteredData.length > 0 && groupBy === "mode" && (() => {
+        const COLS = 9;
+        return (
+          <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
+            <DebugFirstItem item={filteredData[0]} />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
+                  <tr>
+                    <th className="px-4 py-2.5 w-8"></th>
+                    <th className="px-4 py-2.5 text-left">Mode</th>
+                    <th className="px-4 py-2.5 text-right">Matches</th>
+                    <th className="px-4 py-2.5 text-right">Total EXP</th>
+                    <th className="px-4 py-2.5 text-right">Total SP</th>
+                    <th className="px-4 py-2.5 text-right">Kills</th>
+                    <th className="px-4 py-2.5 text-right">Deaths</th>
+                    <th className="px-4 py-2.5 text-right">HS</th>
+                    <th className="px-4 py-2.5 text-right">K/D</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.map((item, idx) => {
+                    const modeVal = pick(item,
+                      "mode","Mode","game_mode","gameMode","mode_id","modeId","match_mode","matchMode");
+                    const matches = getNum(item, ...MATCH_KEYS);
+                    const exp     = getNum(item, ...EXP_KEYS);
+                    const sp      = getNum(item, ...SP_KEYS);
+                    const kills   = getNum(item, ...KILL_KEYS);
+                    const deaths  = getNum(item, ...DEATH_KEYS);
+                    const hs      = getNum(item, ...HS_KEYS);
+                    const kdVal   = kd(kills, deaths);
+                    const isExp   = expandedRows.has(idx);
 
-                  return (
-                    <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
-                      <td className="px-4 py-2.5">
-                        <span className="px-2 py-0.5 rounded border bg-[var(--panel-2)] text-xs font-mono text-white">
-                          Mode {modeVal}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(matches)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-amber-400 font-semibold">{fmt(exp)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(sp)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-emerald-400">{fmt(kills)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-red-400">{fmt(deaths)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-blue-400">{fmt(hs)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-white font-semibold">{kdVal}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    return (
+                      <>
+                        <tr key={`r-${idx}`} onClick={() => toggleRow(idx)}
+                          className={`border-t border-[var(--border)]/40 cursor-pointer transition-colors ${isExp ? "bg-[var(--panel-2)]" : "hover:bg-[var(--panel-2)]/50"}`}>
+                          <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] text-center select-none">
+                            {isExp ? "▾" : "▸"}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {modeVal !== "—"
+                              ? <span className="px-2 py-0.5 rounded border bg-[var(--panel-2)] text-xs font-mono text-white">Mode {modeVal}</span>
+                              : <span className="text-xs italic text-[var(--text-dim)]">unknown</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(matches)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-amber-400 font-semibold">{fmt(exp)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(sp)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-emerald-400">{fmt(kills)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-red-400">{fmt(deaths)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-blue-400">{fmt(hs)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-white font-semibold">{kdVal}</td>
+                        </tr>
+                        {isExp && <ExpandedDetail key={`e-${idx}`} item={item} colSpan={COLS} />}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Table: per day ── */}
-      {!loading && !error && filteredData && filteredData.length > 0 && groupBy === "day" && (
-        <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
-                <tr>
-                  <th className="px-4 py-2.5 text-left whitespace-nowrap">Date</th>
-                  <th className="px-4 py-2.5 text-right">Matches</th>
-                  <th className="px-4 py-2.5 text-right">Total EXP</th>
-                  <th className="px-4 py-2.5 text-right">Total SP</th>
-                  <th className="px-4 py-2.5 text-right">Kills</th>
-                  <th className="px-4 py-2.5 text-right">Deaths</th>
-                  <th className="px-4 py-2.5 text-right">HS</th>
-                  <th className="px-4 py-2.5 text-right">K/D</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredData.map((item, idx) => {
-                  const dayVal  = pick(item, "day", "date", "date_added", "Day");
-                  const matches = getNum(item, "match_count", "matches", "total_matches", "count");
-                  const exp     = getNum(item, "total_experience", "total_exp", "experience");
-                  const sp      = getNum(item, "total_sp", "sp");
-                  const kills   = getNum(item, "total_kills", "kills");
-                  const deaths  = getNum(item, "total_deaths", "deaths");
-                  const hs      = getNum(item, "total_headshots", "headshots", "hs");
-                  const kdVal   = kd(kills, deaths);
+      {!loading && !error && filteredData && filteredData.length > 0 && groupBy === "day" && (() => {
+        const COLS = 9;
+        return (
+          <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
+            <DebugFirstItem item={filteredData[0]} />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)]">
+                  <tr>
+                    <th className="px-4 py-2.5 w-8"></th>
+                    <th className="px-4 py-2.5 text-left whitespace-nowrap">Date</th>
+                    <th className="px-4 py-2.5 text-right">Matches</th>
+                    <th className="px-4 py-2.5 text-right">Total EXP</th>
+                    <th className="px-4 py-2.5 text-right">Total SP</th>
+                    <th className="px-4 py-2.5 text-right">Kills</th>
+                    <th className="px-4 py-2.5 text-right">Deaths</th>
+                    <th className="px-4 py-2.5 text-right">HS</th>
+                    <th className="px-4 py-2.5 text-right">K/D</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.map((item, idx) => {
+                    const dayVal  = pick(item,
+                      "day","Day","date","Date","date_added","dateAdded",
+                      "match_date","matchDate","created_at","createdAt","period","timestamp");
+                    const matches = getNum(item, ...MATCH_KEYS);
+                    const exp     = getNum(item, ...EXP_KEYS);
+                    const sp      = getNum(item, ...SP_KEYS);
+                    const kills   = getNum(item, ...KILL_KEYS);
+                    const deaths  = getNum(item, ...DEATH_KEYS);
+                    const hs      = getNum(item, ...HS_KEYS);
+                    const kdVal   = kd(kills, deaths);
+                    const isExp   = expandedRows.has(idx);
 
-                  return (
-                    <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
-                      <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
-                        {dayVal.includes("T") || dayVal.match(/^\d{4}-\d{2}-\d{2}/)
-                          ? fmtDate(dayVal === "—" ? null : dayVal)
-                          : fmtDay(dayVal === "—" ? null : dayVal)}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(matches)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-amber-400 font-semibold">{fmt(exp)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(sp)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-emerald-400">{fmt(kills)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-red-400">{fmt(deaths)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-blue-400">{fmt(hs)}</td>
-                      <td className="px-4 py-2.5 text-xs text-right font-mono text-white font-semibold">{kdVal}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    const dateDisplay = dayVal === "—" ? "—"
+                      : (dayVal.includes("T") || dayVal.match(/^\d{4}-\d{2}-\d{2}/))
+                        ? fmtDate(dayVal)
+                        : fmtDay(dayVal);
+
+                    return (
+                      <>
+                        <tr key={`r-${idx}`} onClick={() => toggleRow(idx)}
+                          className={`border-t border-[var(--border)]/40 cursor-pointer transition-colors ${isExp ? "bg-[var(--panel-2)]" : "hover:bg-[var(--panel-2)]/50"}`}>
+                          <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] text-center select-none">
+                            {isExp ? "▾" : "▸"}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">{dateDisplay}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(matches)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-amber-400 font-semibold">{fmt(exp)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-[var(--text-dim)]">{fmt(sp)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-emerald-400">{fmt(kills)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-red-400">{fmt(deaths)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-blue-400">{fmt(hs)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-mono text-white font-semibold">{kdVal}</td>
+                        </tr>
+                        {isExp && <ExpandedDetail key={`e-${idx}`} item={item} colSpan={COLS} />}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 }
