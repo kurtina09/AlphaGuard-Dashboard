@@ -15,6 +15,7 @@ const SECTIONS: Section[] = [
       { href: "/dashboard/logs/admin-logs",       label: "Admin Logs" },
       { href: "/dashboard/logs/system-logs",      label: "System Logs" },
       { href: "/dashboard/logs/transaction-logs", label: "Transactions / Shop" },
+      { href: "/dashboard/logs/match-results",   label: "Match Results" },
     ],
   },
   {
