@@ -81,9 +81,12 @@ export default function MatchSummaryView() {
   const [toDate,         setToDate]        = useState("");
   const [codenameSearch, setCodenameSearch]= useState("");
   const [data,           setData]          = useState<SummaryItem[] | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [rawBody,        setRawBody]       = useState<any>(null);
   const [loading,        setLoading]       = useState(false);
   const [error,          setError]         = useState<string | null>(null);
   const [token,          setToken]         = useState<string | null>(null);
+  const [showRaw,        setShowRaw]       = useState(false);
 
   useEffect(() => {
     fetch("/api/admin-logs")
@@ -112,10 +115,23 @@ export default function MatchSummaryView() {
       const b = body as { error?: string; message?: string };
       if (!res.ok) throw new Error(b.error ?? b.message ?? `Error ${res.status}`);
 
-      // Handle plain array or wrapped { items/data }
+      setRawBody(body);
+
+      // Handle plain array or any wrapped shape
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const items = Array.isArray(body) ? body : ((body as any).items ?? (body as any).data ?? []);
-      setData(items as SummaryItem[]);
+      const anyBody = body as any;
+      const items: SummaryItem[] = Array.isArray(body)
+        ? body
+        : Array.isArray(anyBody.items)   ? anyBody.items
+        : Array.isArray(anyBody.data)    ? anyBody.data
+        : Array.isArray(anyBody.content) ? anyBody.content
+        : Array.isArray(anyBody.results) ? anyBody.results
+        : Array.isArray(anyBody.records) ? anyBody.records
+        : typeof anyBody === "object" && anyBody !== null
+          // last resort: grab the first array-valued key
+          ? (Object.values(anyBody).find((v) => Array.isArray(v)) as SummaryItem[] ?? [])
+          : [];
+      setData(items);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
@@ -224,10 +240,27 @@ export default function MatchSummaryView() {
         <div className="bg-[var(--panel)] border rounded-lg p-6 text-[var(--danger)]">{error}</div>
       )}
       {!loading && !error && filteredData && filteredData.length === 0 && (
-        <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">
-          {codenameSearch.trim() && data && data.length > 0
-            ? `No players matching "${codenameSearch.trim()}".`
-            : "No summary data found."}
+        <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
+          <div className="p-10 text-center text-[var(--text-dim)]">
+            {codenameSearch.trim() && data && data.length > 0
+              ? `No players matching "${codenameSearch.trim()}".`
+              : "No summary data found."}
+          </div>
+          {rawBody !== null && (
+            <div className="border-t border-[var(--border)] px-4 pb-4">
+              <button
+                onClick={() => setShowRaw((v) => !v)}
+                className="mt-3 text-xs text-[var(--text-dim)] hover:text-white underline"
+              >
+                {showRaw ? "Hide" : "Show"} raw API response (debug)
+              </button>
+              {showRaw && (
+                <pre className="mt-2 p-3 bg-[var(--panel-2)] rounded text-[10px] font-mono text-white/70 overflow-x-auto max-h-64 whitespace-pre-wrap break-all">
+                  {JSON.stringify(rawBody, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
         </div>
       )}
 
