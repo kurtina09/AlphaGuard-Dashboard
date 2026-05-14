@@ -22,8 +22,7 @@ const SECTIONS: Section[] = [
     id: "screenshots",
     title: "Screenshots",
     links: [
-      { href: "/dashboard/screenshots",    label: "Screenshots v1 (Inactive)" },
-      { href: "/dashboard/screenshots-v2", label: "Screenshots v2" },
+      { href: "/dashboard/screenshots-v2", label: "Screenshots" },
     ],
   },
   {
