@@ -417,11 +417,6 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
             Next ›
           </button>
 
-          {data && !loading && (
-            <span className="text-xs text-[var(--text-dim)] ml-1">
-              p.{data.page + 1}/{data.total_pages} · {data.total_count.toLocaleString()} total
-            </span>
-          )}
         </div>
 
         {/* ── Collapsible filter inputs ── */}
