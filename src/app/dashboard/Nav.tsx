@@ -60,9 +60,11 @@ const STORAGE_KEY = "ag-nav-open";
 export default function Nav({
   codename,
   roleName,
+  onClose,
 }: {
   codename: string;
   roleName: string;
+  onClose?: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -96,11 +98,11 @@ export default function Nav({
   }
 
   return (
-    <aside className="w-60 shrink-0 border-r bg-[var(--panel)] flex flex-col">
+    <aside className="w-60 h-full shrink-0 border-r bg-[var(--panel)] flex flex-col">
       <div className="px-4 py-4 border-b flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-icon.png" alt="AlphaGuard" className="w-10 h-10 shrink-0" />
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="text-base font-bold tracking-wide" style={{ color: "var(--accent)" }}>
             AlphaGuard
           </div>
@@ -108,6 +110,18 @@ export default function Nav({
             Anti-Cheat
           </div>
         </div>
+        {/* Close button — mobile only */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            aria-label="Close navigation"
+            className="lg:hidden p-1.5 rounded text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)] transition-colors shrink-0"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3">

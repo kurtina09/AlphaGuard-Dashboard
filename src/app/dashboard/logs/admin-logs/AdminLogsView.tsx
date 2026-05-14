@@ -249,7 +249,7 @@ export default function AdminLogsView() {
     <>
       {/* ── Filter bar ── */}
       <div
-        className="sticky -top-8 z-50 -mx-8 px-8 pt-11 pb-4 border-b border-[var(--panel)]"
+        className="sticky -top-4 sm:-top-8 z-50 -mx-4 sm:-mx-8 px-4 sm:px-8 pt-6 sm:pt-11 pb-4 border-b border-[var(--panel)]"
         style={{ backgroundColor: "#0b0d12", boxShadow: "0 4px 24px 8px #0b0d12" }}
       >
         <form
