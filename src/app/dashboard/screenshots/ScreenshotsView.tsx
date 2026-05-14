@@ -350,6 +350,9 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
     setPage(0);
   }
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const hasActiveFilters = !!(guid || from || to);
+
   const totalPages = data?.total_pages ?? 0;
 
   // Compute freshness range for current page
@@ -359,72 +362,116 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
 
   return (
     <>
-      <div className="sticky -top-4 sm:-top-8 z-50 -mx-4 sm:-mx-8 px-4 sm:px-8 pt-6 sm:pt-11 pb-4 border-b border-[var(--panel)]" style={{ backgroundColor: "#0b0d12", boxShadow: "0 4px 24px 8px #0b0d12" }}>
-      <form
-        onSubmit={applyFilter}
-        className="flex flex-wrap gap-3 items-end mb-3 bg-[var(--panel)] border rounded-lg p-4"
+      <div
+        className="sticky -top-4 sm:-top-8 z-50 -mx-4 sm:-mx-8 px-4 sm:px-8 pt-6 sm:pt-11 pb-3 border-b border-[var(--panel)]"
+        style={{ backgroundColor: "#0b0d12", boxShadow: "0 4px 24px 8px #0b0d12" }}
       >
-        <div className="flex flex-col gap-1 flex-1 min-w-[240px]">
-          <label className="text-xs text-[var(--text-dim)]">Player GUID</label>
-          <input
-            type="text"
-            value={guidInput}
-            onChange={(e) => setGuidInput(e.target.value)}
-            placeholder="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-            className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-[var(--text-dim)]">From</label>
-          <input
-            type="datetime-local"
-            value={fromInput}
-            onChange={(e) => setFromInput(e.target.value)}
-            className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-[var(--text-dim)]">To</label>
-          <input
-            type="datetime-local"
-            value={toInput}
-            onChange={(e) => setToInput(e.target.value)}
-            className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
-          />
-        </div>
-        <button type="submit" className="px-4 py-1.5 rounded-md bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)]">
-          Filter
-        </button>
-        <button type="button" onClick={reset} className="px-4 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white">
-          Reset
-        </button>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="px-4 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40"
-        >
-          {loading ? "Loading…" : "Refresh"}
-        </button>
-        <button
-          type="button"
-          disabled={!data || data.first || loading}
-          onClick={() => setPage((p) => Math.max(0, p - 1))}
-          className="px-4 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          disabled={!data || data.last || loading}
-          onClick={() => setPage((p) => p + 1)}
-          className="px-4 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Next
-        </button>
-      </form>
+        {/* ── Always-visible control bar ── */}
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          {/* Filter toggle */}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition-colors ${
+              filtersOpen
+                ? "border-[var(--accent)] text-white bg-[var(--accent)]/10"
+                : "text-[var(--text-dim)] hover:text-white"
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <line x1="1" y1="3.5" x2="13" y2="3.5"/>
+              <line x1="3" y1="7"   x2="11" y2="7"/>
+              <line x1="5" y1="10.5" x2="9" y2="10.5"/>
+            </svg>
+            Filters
+            {hasActiveFilters && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" title="Filters active" />
+            )}
+            <span className="text-xs opacity-50">{filtersOpen ? "▾" : "▸"}</span>
+          </button>
 
-      {data && <Pagination data={data} loading={loading} setPage={setPage} />}
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="px-3 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40"
+          >
+            {loading ? "Loading…" : "Refresh"}
+          </button>
+
+          <button
+            type="button"
+            disabled={!data || data.first || loading}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="px-3 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ‹ Prev
+          </button>
+
+          <button
+            type="button"
+            disabled={!data || data.last || loading}
+            onClick={() => setPage((p) => p + 1)}
+            className="px-3 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next ›
+          </button>
+
+          {data && !loading && (
+            <span className="text-xs text-[var(--text-dim)] ml-1">
+              p.{data.page + 1}/{data.total_pages} · {data.total_count.toLocaleString()} total
+            </span>
+          )}
+        </div>
+
+        {/* ── Collapsible filter inputs ── */}
+        {filtersOpen && (
+          <form
+            onSubmit={(e) => { applyFilter(e); setFiltersOpen(false); }}
+            className="flex flex-wrap gap-3 items-end bg-[var(--panel)] border rounded-lg p-4 mb-2"
+          >
+            <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+              <label className="text-xs text-[var(--text-dim)]">Player GUID</label>
+              <input
+                type="text"
+                value={guidInput}
+                onChange={(e) => setGuidInput(e.target.value)}
+                placeholder="a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)] font-mono"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-[var(--text-dim)]">From</label>
+              <input
+                type="datetime-local"
+                value={fromInput}
+                onChange={(e) => setFromInput(e.target.value)}
+                className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-[var(--text-dim)]">To</label>
+              <input
+                type="datetime-local"
+                value={toInput}
+                onChange={(e) => setToInput(e.target.value)}
+                className="px-3 py-1.5 bg-[var(--panel-2)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+            <button type="submit" className="px-4 py-1.5 rounded-md bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)]">
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={() => { reset(); setFiltersOpen(false); }}
+              className="px-4 py-1.5 rounded-md border text-sm text-[var(--text-dim)] hover:text-white"
+            >
+              Reset
+            </button>
+          </form>
+        )}
+
+        {data && <Pagination data={data} loading={loading} setPage={setPage} />}
       </div>
 
       {loading && (
