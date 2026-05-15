@@ -19,7 +19,7 @@ export default function LogsTabs() {
   return (
     <>
       {/* Tab bar */}
-      <div className="flex gap-0 mb-6 border-b border-[var(--border)] overflow-x-auto">
+      <div className="flex flex-wrap gap-0 mb-6 border-b border-[var(--border)]">
         {TABS.map((t) => (
           <button
             key={t.id}
