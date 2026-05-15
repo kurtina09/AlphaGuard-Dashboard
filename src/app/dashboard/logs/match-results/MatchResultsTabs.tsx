@@ -22,10 +22,10 @@ export default function MatchResultsTabs() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px rounded-t-md ${
               tab === t.id
-                ? "border-[var(--accent)] text-white"
-                : "border-transparent text-[var(--text-dim)] hover:text-white hover:border-[var(--border)]"
+                ? "border-[var(--accent)] text-white bg-[var(--accent)]/15"
+                : "border-transparent text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)]/60 hover:border-[var(--border)]"
             }`}
           >
             {t.label}
