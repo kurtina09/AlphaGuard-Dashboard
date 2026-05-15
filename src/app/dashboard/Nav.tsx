@@ -43,7 +43,6 @@ const SECTIONS: Section[] = [
       { href: "/dashboard/hwid-manager",   label: "BAN — HWID" },
       { href: "/dashboard/ban",            label: "BAN — Account" },
       { href: "/dashboard/detections",     label: "Banned Players" },
-      { href: "/dashboard/banned-ticket",  label: "Banned — Waiting Ticket" },
     ],
   },
   {
