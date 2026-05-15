@@ -1,4 +1,4 @@
-import ScreenshotsView from "../screenshots/ScreenshotsView";
+import ScreenshotsView from "./ScreenshotsView";
 
 export default function ScreenshotsV3Page() {
   return (
