@@ -25,6 +25,13 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: "players",
+    title: "Players",
+    links: [
+      { href: "/dashboard/players", label: "Players" },
+    ],
+  },
+  {
     id: "records",
     title: "Records",
     links: [
