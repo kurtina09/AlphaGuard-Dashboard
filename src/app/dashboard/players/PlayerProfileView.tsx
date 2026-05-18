@@ -163,6 +163,84 @@ function MatchDetailModal({ item, matchGuid, token, onClose }: {
   }, [load, onClose]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function p(row: any, ...keys: string[]): any {
+    for (const k of keys) if (row[k] !== undefined && row[k] !== null) return row[k];
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function renderScoreboard(rows: any[]) {
+    if (!rows.length) return <div className="px-4 py-8 text-center text-sm text-[var(--text-dim)]">No scoreboard data.</div>;
+    // Sort: team 0 first, then by kills desc
+    const sorted = [...rows].sort((a, b) => {
+      const ta = p(a, "team") ?? 0;
+      const tb = p(b, "team") ?? 0;
+      if (ta !== tb) return ta - tb;
+      return (p(b, "total_kills","kills") ?? 0) - (p(a, "total_kills","kills") ?? 0);
+    });
+    let lastTeam: number | null = null;
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-[var(--panel-2)] text-xs text-[var(--text-dim)] sticky top-0">
+            <tr>
+              <th className="px-4 py-2.5 text-left">Codename</th>
+              <th className="px-4 py-2.5 text-left">Team</th>
+              <th className="px-4 py-2.5 text-right">K</th>
+              <th className="px-4 py-2.5 text-right">D</th>
+              <th className="px-4 py-2.5 text-right">HS</th>
+              <th className="px-4 py-2.5 text-right">BS</th>
+              <th className="px-4 py-2.5 text-right">DMG</th>
+              <th className="px-4 py-2.5 text-right whitespace-nowrap">Avg DMG</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row, i) => {
+              const team     = p(row, "team") ?? 0;
+              const codename = p(row, "codename","player_codename","name","username") ?? "—";
+              const kills    = p(row, "total_kills","kills") ?? 0;
+              const deaths   = p(row, "total_deaths","deaths") ?? 0;
+              const hs       = p(row, "headshots","headshot") ?? 0;
+              const bs       = p(row, "bodyshots","bodyshot") ?? 0;
+              const dmg      = p(row, "total_damage_dealt","damage","total_damage") ?? 0;
+              const mins     = p(row, "minutes_played","minutes") ?? 0;
+              const avgDmg   = mins > 0 ? Math.round(dmg / mins) : dmg;
+
+              const isNewTeam = team !== lastTeam;
+              lastTeam = team;
+              const teamCls  = team === 0 ? "bg-blue-500/20 text-blue-300" : "bg-red-500/20 text-red-300";
+              const teamLabel= team === 0 ? "Blue" : "Red";
+              const rowBg    = team === 0 ? "hover:bg-blue-900/10" : "hover:bg-red-900/10";
+
+              return (
+                <>
+                  {isNewTeam && i > 0 && (
+                    <tr key={`divider-${i}`}>
+                      <td colSpan={8} className="h-px bg-[var(--border)]/60 p-0" />
+                    </tr>
+                  )}
+                  <tr key={i} className={`border-t border-[var(--border)]/20 transition-colors ${rowBg}`}>
+                    <td className="px-4 py-2.5 font-medium text-white">{codename}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${teamCls}`}>{teamLabel}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-right text-white font-semibold">{kills}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{deaths}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{hs}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{bs}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{dmg.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{avgDmg.toLocaleString()}</td>
+                  </tr>
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function renderRows(rows: any[]) {
     if (!rows.length) return <div className="px-4 py-8 text-center text-sm text-[var(--text-dim)]">No data for this section.</div>;
     const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
@@ -285,7 +363,11 @@ function MatchDetailModal({ item, matchGuid, token, onClose }: {
               <button onClick={load} className="underline text-[var(--text-dim)] hover:text-white">Retry</button>
             </div>
           )}
-          {!loading && !error && detail && renderRows(getSection(detail, tab))}
+          {!loading && !error && detail && (
+            tab === "scoreboard"
+              ? renderScoreboard(getSection(detail, tab))
+              : renderRows(getSection(detail, tab))
+          )}
         </div>
       </div>
     </div>
