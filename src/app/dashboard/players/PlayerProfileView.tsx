@@ -113,6 +113,21 @@ function ActionButton({ label, description, colorClass, onConfirm }: {
 }
 
 /* ── Generic data tab ────────────────────────────────────────────────────── */
+function fmtDate(s: string | number | null | undefined) {
+  if (!s || s === 0) return "—";
+  const d = new Date(typeof s === "number" ? s * 1000 : s);
+  if (isNaN(d.getTime())) return String(s);
+  return d.toLocaleString("en-PH", { timeZone: "Asia/Manila" });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function pickField(item: Record<string, any>, ...keys: string[]): any {
+  for (const k of keys) {
+    if (item[k] !== undefined && item[k] !== null) return item[k];
+  }
+  return null;
+}
+
 function DataTab({ guid, path, token }: { guid: string; path: string; token: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data,    setData]    = useState<any>(null);
@@ -160,18 +175,12 @@ function DataTab({ guid, path, token }: { guid: string; path: string; token: str
     : Array.isArray(data?.items)   ? data.items
     : Array.isArray(data?.data)    ? data.data
     : Array.isArray(data?.content) ? data.content
-    : typeof data === "object" && data !== null
-      ? [data]
-      : [];
+    : typeof data === "object" && data !== null ? [data]
+    : [];
 
   if (items.length === 0) return (
-    <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)] text-sm">
-      No data found.
-    </div>
+    <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)] text-sm">No data found.</div>
   );
-
-  // Collect all keys across items for table headers
-  const allKeys = Array.from(new Set(items.flatMap((item) => Object.keys(item))));
 
   return (
     <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
@@ -183,30 +192,70 @@ function DataTab({ guid, path, token }: { guid: string; path: string; token: str
         <table className="w-full text-sm">
           <thead className="bg-[var(--panel-2)]/60 text-xs text-[var(--text-dim)]">
             <tr>
-              {allKeys.map((k) => (
-                <th key={k} className="px-4 py-2.5 text-left whitespace-nowrap">{k}</th>
-              ))}
+              <th className="px-4 py-2.5 text-left">Name</th>
+              <th className="px-4 py-2.5 text-left">Equipped</th>
+              <th className="px-4 py-2.5 text-left">Expires</th>
+              <th className="px-4 py-2.5 text-left">Duration</th>
+              <th className="px-4 py-2.5 text-left whitespace-nowrap">Date Added</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((item, idx) => (
-              <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
-                {allKeys.map((k) => {
-                  const v = item[k];
-                  const str = v === null || v === undefined ? "—"
-                    : typeof v === "object" ? JSON.stringify(v)
-                    : String(v);
-                  return (
-                    <td key={k} className="px-4 py-2.5">
-                      <div className="flex items-center gap-1 min-w-0">
-                        <span className="text-xs font-mono text-white/80 break-all max-w-[200px]" title={str}>{str}</span>
-                        {str !== "—" && str.length > 8 && <CopyButton text={str} />}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {items.map((item, idx) => {
+              const name = pickField(item,
+                "weapon_name","item_name","character_name","icon_name",
+                "emblem_name","background_name","name","title","type"
+              );
+              const isInStorage = pickField(item, "is_in_storage");
+              const equipped    = isInStorage !== null ? !isInStorage : pickField(item, "equipped","is_equipped");
+              const expires     = pickField(item, "expires","has_expiry","will_expire");
+              const duration    = pickField(item, "defined_duration","duration","duration_pieces","expires_at");
+              const dateAdded   = pickField(item, "date_added","created_at","createdAt","dateAdded");
+
+              return (
+                <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
+                  {/* Name */}
+                  <td className="px-4 py-2.5 font-medium text-white">
+                    {name ?? "—"}
+                  </td>
+
+                  {/* Equipped */}
+                  <td className="px-4 py-2.5">
+                    {equipped === null ? (
+                      <span className="text-xs text-[var(--text-dim)]">—</span>
+                    ) : (
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        equipped ? "bg-emerald-500/20 text-emerald-400" : "bg-zinc-700/40 text-zinc-400"
+                      }`}>
+                        {equipped ? "Yes" : "No"}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Expires */}
+                  <td className="px-4 py-2.5">
+                    {expires === null ? (
+                      <span className="text-xs text-[var(--text-dim)]">—</span>
+                    ) : (
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        expires ? "bg-amber-500/20 text-amber-400" : "bg-zinc-700/40 text-zinc-400"
+                      }`}>
+                        {expires ? "Yes" : "No"}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Duration */}
+                  <td className="px-4 py-2.5 text-xs text-[var(--text-dim)]">
+                    {duration !== null ? (duration === 0 ? "Permanent" : String(duration)) : "—"}
+                  </td>
+
+                  {/* Date Added */}
+                  <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
+                    {fmtDate(dateAdded)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
