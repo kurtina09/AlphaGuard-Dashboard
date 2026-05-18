@@ -1,12 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Profile = Record<string, any>;
 
 const WORKER_API = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
 
+/* ── Sub-tabs ────────────────────────────────────────────────────────────── */
+type SubTab = "profile" | "weapons" | "items" | "gifts" | "characters" | "icons" | "emblems" | "backgrounds" | "match-stats";
+
+const SUB_TABS: { id: SubTab; label: string; path?: string }[] = [
+  { id: "profile",    label: "Profile" },
+  { id: "weapons",    label: "Weapons",     path: "weapons" },
+  { id: "items",      label: "Items",       path: "items" },
+  { id: "gifts",      label: "Gifts",       path: "gifts" },
+  { id: "characters", label: "Characters",  path: "characters" },
+  { id: "icons",      label: "Icons",       path: "icons" },
+  { id: "emblems",    label: "Emblems",     path: "emblems" },
+  { id: "backgrounds",label: "Backgrounds", path: "emblem-backgrounds" },
+  { id: "match-stats",label: "Match Stats", path: "match-stats" },
+];
+
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -38,9 +54,7 @@ function Badge({ label, value }: { label: string; value: boolean | null | undefi
     <div className="bg-[var(--panel-2)] rounded-md px-3 py-2">
       <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wide mb-1">{label}</div>
       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-        active
-          ? "bg-emerald-500/20 text-emerald-400"
-          : "bg-zinc-700/40 text-zinc-400"
+        active ? "bg-emerald-500/20 text-emerald-400" : "bg-zinc-700/40 text-zinc-400"
       }`}>
         {active ? "Yes" : "No"}
       </span>
@@ -48,14 +62,11 @@ function Badge({ label, value }: { label: string; value: boolean | null | undefi
   );
 }
 
+/* ── Action button ───────────────────────────────────────────────────────── */
 type ActionState = "idle" | "confirm" | "loading" | "done" | "error";
 
-function ActionButton({
-  label, description, colorClass, onConfirm,
-}: {
-  label: string;
-  description: string;
-  colorClass: string;
+function ActionButton({ label, description, colorClass, onConfirm }: {
+  label: string; description: string; colorClass: string;
   onConfirm: (reason: string) => Promise<string | null>;
 }) {
   const [state,  setState]  = useState<ActionState>("idle");
@@ -80,24 +91,19 @@ function ActionButton({
     <div className="flex flex-col gap-2 p-3 border rounded-lg bg-[var(--panel-2)]">
       <div className="text-xs font-semibold text-white">{label} — confirm</div>
       <div className="text-xs text-[var(--text-dim)]">{description}</div>
-      <input
-        type="text" value={reason} onChange={(e) => setReason(e.target.value)}
+      <input type="text" value={reason} onChange={(e) => setReason(e.target.value)}
         placeholder="Reason (optional)…"
-        className="px-3 py-1.5 bg-[var(--panel)] border rounded text-sm outline-none focus:border-[var(--accent)]"
-      />
+        className="px-3 py-1.5 bg-[var(--panel)] border rounded text-sm outline-none focus:border-[var(--accent)]" />
       <div className="flex gap-2">
         <button onClick={execute} disabled={state === "loading"}
           className={`px-4 py-1.5 rounded text-sm text-white font-medium disabled:opacity-50 ${colorClass}`}>
           {state === "loading" ? "Sending…" : "Confirm"}
         </button>
         <button onClick={() => { setState("idle"); setReason(""); }}
-          className="px-4 py-1.5 rounded border text-sm text-[var(--text-dim)] hover:text-white">
-          Cancel
-        </button>
+          className="px-4 py-1.5 rounded border text-sm text-[var(--text-dim)] hover:text-white">Cancel</button>
       </div>
     </div>
   );
-
   return (
     <button onClick={() => setState("confirm")}
       className={`px-4 py-2 rounded-md text-sm font-medium text-white transition-opacity hover:opacity-90 ${colorClass}`}>
@@ -106,6 +112,109 @@ function ActionButton({
   );
 }
 
+/* ── Generic data tab ────────────────────────────────────────────────────── */
+function DataTab({ guid, path, token }: { guid: string; path: string; token: string }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [data,    setData]    = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!guid || !token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res  = await fetch(`${WORKER_API}/player/${encodeURIComponent(guid)}/${path}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const text = await res.text();
+      let body: unknown;
+      try { body = JSON.parse(text); } catch { throw new Error(`Non-JSON (${res.status}): ${text.slice(0, 200)}`); }
+      const b = body as { error?: string; message?: string };
+      if (!res.ok) throw new Error(b.error ?? b.message ?? `Error ${res.status}`);
+      setData(body);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load.");
+    } finally {
+      setLoading(false);
+    }
+  }, [guid, path, token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return (
+    <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">Loading…</div>
+  );
+  if (error) return (
+    <div className="bg-[var(--panel)] border rounded-lg p-4 text-[var(--danger)] text-sm flex items-center justify-between">
+      <span>{error}</span>
+      <button onClick={load} className="text-xs text-[var(--text-dim)] hover:text-white underline ml-4">Retry</button>
+    </div>
+  );
+  if (data === null) return null;
+
+  // Normalise to array
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const items: any[] = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.items)   ? data.items
+    : Array.isArray(data?.data)    ? data.data
+    : Array.isArray(data?.content) ? data.content
+    : typeof data === "object" && data !== null
+      ? [data]
+      : [];
+
+  if (items.length === 0) return (
+    <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)] text-sm">
+      No data found.
+    </div>
+  );
+
+  // Collect all keys across items for table headers
+  const allKeys = Array.from(new Set(items.flatMap((item) => Object.keys(item))));
+
+  return (
+    <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--panel-2)]">
+        <span className="text-xs text-[var(--text-dim)]">{items.length} record{items.length !== 1 ? "s" : ""}</span>
+        <button onClick={load} className="text-xs text-[var(--text-dim)] hover:text-white transition-colors">↻ Refresh</button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-[var(--panel-2)]/60 text-xs text-[var(--text-dim)]">
+            <tr>
+              {allKeys.map((k) => (
+                <th key={k} className="px-4 py-2.5 text-left whitespace-nowrap">{k}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, idx) => (
+              <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
+                {allKeys.map((k) => {
+                  const v = item[k];
+                  const str = v === null || v === undefined ? "—"
+                    : typeof v === "object" ? JSON.stringify(v)
+                    : String(v);
+                  return (
+                    <td key={k} className="px-4 py-2.5">
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className="text-xs font-mono text-white/80 break-all max-w-[200px]" title={str}>{str}</span>
+                        {str !== "—" && str.length > 8 && <CopyButton text={str} />}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main view ───────────────────────────────────────────────────────────── */
 export default function PlayerProfileView({
   guid: initialGuid,
   onHwid,
@@ -118,6 +227,7 @@ export default function PlayerProfileView({
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState<string | null>(null);
   const [token,     setToken]     = useState<string | null>(null);
+  const [subTab,    setSubTab]    = useState<SubTab>("profile");
 
   useEffect(() => {
     fetch("/api/admin-logs")
@@ -140,6 +250,7 @@ export default function PlayerProfileView({
     setLoading(true);
     setError(null);
     setProfile(null);
+    setSubTab("profile");
     try {
       const res  = await fetch(`${WORKER_API}/player/${encodeURIComponent(guid.trim())}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -177,15 +288,16 @@ export default function PlayerProfileView({
     }
   }
 
-  // Shorthand accessors for the nested structure
-  const p        = profile;
-  const player   = p?.player;
-  const prof     = player?.profile;
-  const role     = prof?.role;
+  const p      = profile;
+  const player = p?.player;
+  const prof   = player?.profile;
+  const role   = prof?.role;
   const userGuid = p?.guid ?? "—";
 
+  const activeSubTab = SUB_TABS.find((t) => t.id === subTab);
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {/* GUID lookup */}
       <div className="flex gap-2 items-center">
         <input
@@ -205,58 +317,22 @@ export default function PlayerProfileView({
       {error && <div className="bg-[var(--panel)] border rounded-lg p-4 text-[var(--danger)] text-sm">{error}</div>}
 
       {profile && (
-        <div className="flex flex-col gap-4">
-
-          {/* ── Account ── */}
-          <div className="bg-[var(--panel)] border rounded-lg p-4">
-            <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Account</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Field label="Username"   value={p?.username} />
-              <Field label="Email"      value={p?.email} />
-              <Field label="User GUID"  value={userGuid} mono />
-              <Badge label="Verified"   value={p?.verified} />
-              <Badge label="Allow Gifting"       value={player?.allowed_gift} />
-              <Badge label="Marketplace Access"  value={p?.market_place_open} />
+        <>
+          {/* Player header */}
+          <div className="flex items-center gap-3 px-1">
+            <div>
+              <div className="text-base font-semibold text-white">{player?.codename ?? "—"}</div>
+              <div className="text-xs text-[var(--text-dim)] font-mono">{userGuid}</div>
             </div>
-          </div>
-
-          {/* ── Player ── */}
-          <div className="bg-[var(--panel)] border rounded-lg p-4">
-            <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Player</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Field label="Codename"    value={player?.codename} />
-              <Field label="Player GUID" value={player?.guid} mono />
-              <Field label="Role"        value={role?.name} />
-              <Field label="EXP"         value={player?.exp} />
-              <Field label="SP"          value={player?.sp} />
-              <Field label="Cash"        value={player?.cash} />
-            </div>
-          </div>
-
-          {/* ── Stats ── */}
-          <div className="bg-[var(--panel)] border rounded-lg p-4">
-            <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Stats</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Field label="Kills"          value={prof?.kills} />
-              <Field label="Deaths"         value={prof?.deaths} />
-              <Field label="Wins"           value={prof?.wins} />
-              <Field label="Losses"         value={prof?.loses} />
-              <Field label="Headshot Rate"  value={prof?.headshot_rate != null ? `${prof.headshot_rate}%` : null} />
-            </div>
-          </div>
-
-          {/* ── Actions ── */}
-          <div className="bg-[var(--panel)] border rounded-lg p-4">
-            <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Live Session Actions</div>
-            <div className="flex flex-wrap gap-3">
+            <div className="ml-auto flex gap-2">
               <ActionButton
-                label="⚡ Ban Player"
+                label="⚡ Ban"
                 description="Kicks the player from a live server and writes an active-session ban."
                 colorClass="bg-red-600 hover:bg-red-700"
                 onConfirm={(reason) => postAction("banplayer", userGuid, reason)}
               />
               <ActionButton
-                label="⏏ Disconnect"
+                label="⏏ DC"
                 description="Disconnects the player from a live server. No ban is written."
                 colorClass="bg-orange-600 hover:bg-orange-700"
                 onConfirm={(reason) => postAction("dcplayer", userGuid, reason)}
@@ -264,14 +340,76 @@ export default function PlayerProfileView({
               <button
                 onClick={() => userGuid !== "—" && onHwid(userGuid)}
                 disabled={userGuid === "—"}
-                className="px-4 py-2 rounded-md border border-blue-500/40 text-blue-400 text-sm hover:bg-blue-500/10 disabled:opacity-40 transition-colors"
+                className="px-3 py-1.5 rounded-md border border-blue-500/40 text-blue-400 text-sm hover:bg-blue-500/10 disabled:opacity-40 transition-colors"
               >
-                View HWID Info →
+                HWID →
               </button>
             </div>
           </div>
 
-        </div>
+          {/* Sub-tab bar */}
+          <div className="flex overflow-x-auto gap-0 border-b border-[var(--border)] -mb-1">
+            {SUB_TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setSubTab(t.id)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
+                  subTab === t.id
+                    ? "border-[var(--accent)] text-white bg-[var(--accent)]/10"
+                    : "border-transparent text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)]/60"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Profile tab */}
+          {subTab === "profile" && (
+            <div className="flex flex-col gap-4">
+              {/* Account */}
+              <div className="bg-[var(--panel)] border rounded-lg p-4">
+                <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Account</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <Field label="Username"           value={p?.username} />
+                  <Field label="Email"              value={p?.email} />
+                  <Field label="User GUID"          value={userGuid} mono />
+                  <Badge label="Verified"           value={p?.verified} />
+                  <Badge label="Allow Gifting"      value={player?.allowed_gift} />
+                  <Badge label="Marketplace Access" value={p?.market_place_open} />
+                </div>
+              </div>
+              {/* Player */}
+              <div className="bg-[var(--panel)] border rounded-lg p-4">
+                <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Player</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <Field label="Codename"    value={player?.codename} />
+                  <Field label="Player GUID" value={player?.guid} mono />
+                  <Field label="Role"        value={role?.name} />
+                  <Field label="EXP"         value={player?.exp} />
+                  <Field label="SP"          value={player?.sp} />
+                  <Field label="Cash"        value={player?.cash} />
+                </div>
+              </div>
+              {/* Stats */}
+              <div className="bg-[var(--panel)] border rounded-lg p-4">
+                <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Stats</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <Field label="Kills"         value={prof?.kills} />
+                  <Field label="Deaths"        value={prof?.deaths} />
+                  <Field label="Wins"          value={prof?.wins} />
+                  <Field label="Losses"        value={prof?.loses} />
+                  <Field label="Headshot Rate" value={prof?.headshot_rate != null ? `${prof.headshot_rate}%` : null} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Data tabs — lazy loaded */}
+          {subTab !== "profile" && activeSubTab?.path && token && (
+            <DataTab key={`${userGuid}-${activeSubTab.path}`} guid={userGuid} path={activeSubTab.path} token={token} />
+          )}
+        </>
       )}
     </div>
   );
