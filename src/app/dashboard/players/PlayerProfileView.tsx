@@ -10,8 +10,10 @@ const WORKER_API = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
-      className="shrink-0 px-1.5 py-0.5 rounded text-xs border border-transparent text-[var(--text-dim)] hover:text-white hover:border-[var(--accent)] transition-colors">
+    <button
+      onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
+      className="shrink-0 px-1.5 py-0.5 rounded text-xs border border-transparent text-[var(--text-dim)] hover:text-white hover:border-[var(--accent)] transition-colors"
+    >
       {copied ? "✓" : "Copy"}
     </button>
   );
@@ -30,18 +32,31 @@ function Field({ label, value, mono = false }: { label: string; value: string | 
   );
 }
 
+function Badge({ label, value }: { label: string; value: boolean | null | undefined }) {
+  const active = value === true;
+  return (
+    <div className="bg-[var(--panel-2)] rounded-md px-3 py-2">
+      <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wide mb-1">{label}</div>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+        active
+          ? "bg-emerald-500/20 text-emerald-400"
+          : "bg-zinc-700/40 text-zinc-400"
+      }`}>
+        {active ? "Yes" : "No"}
+      </span>
+    </div>
+  );
+}
+
 type ActionState = "idle" | "confirm" | "loading" | "done" | "error";
 
 function ActionButton({
-  label,
-  description,
-  colorClass,
-  onConfirm,
+  label, description, colorClass, onConfirm,
 }: {
   label: string;
   description: string;
   colorClass: string;
-  onConfirm: (reason: string) => Promise<string | null>; // returns error or null
+  onConfirm: (reason: string) => Promise<string | null>;
 }) {
   const [state,  setState]  = useState<ActionState>("idle");
   const [reason, setReason] = useState("");
@@ -51,7 +66,7 @@ function ActionButton({
     setState("loading");
     const err = await onConfirm(reason);
     if (err) { setMsg(err); setState("error"); }
-    else      { setMsg("Done."); setState("done"); setTimeout(() => setState("idle"), 3000); }
+    else     { setMsg("Done."); setState("done"); setTimeout(() => setState("idle"), 3000); }
   }
 
   if (state === "done")  return <div className="text-xs text-emerald-400 py-1">{msg}</div>;
@@ -61,15 +76,12 @@ function ActionButton({
       <button onClick={() => setState("idle")} className="text-xs text-[var(--text-dim)] hover:text-white underline">Retry</button>
     </div>
   );
-
   if (state === "confirm" || state === "loading") return (
     <div className="flex flex-col gap-2 p-3 border rounded-lg bg-[var(--panel-2)]">
       <div className="text-xs font-semibold text-white">{label} — confirm</div>
       <div className="text-xs text-[var(--text-dim)]">{description}</div>
       <input
-        type="text"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
+        type="text" value={reason} onChange={(e) => setReason(e.target.value)}
         placeholder="Reason (optional)…"
         className="px-3 py-1.5 bg-[var(--panel)] border rounded text-sm outline-none focus:border-[var(--accent)]"
       />
@@ -114,9 +126,8 @@ export default function PlayerProfileView({
       .catch(() => {});
   }, []);
 
-  // Auto-load when navigated from Search with a guid
   useEffect(() => {
-    if (initialGuid) { setGuidInput(initialGuid); }
+    if (initialGuid) setGuidInput(initialGuid);
   }, [initialGuid]);
 
   useEffect(() => {
@@ -151,10 +162,7 @@ export default function PlayerProfileView({
     try {
       const res = await fetch(`${WORKER_API}/admin/${endpoint}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ user_guid: guid, player_guid: guid, reason: reason || undefined }),
       });
       const text = await res.text();
@@ -169,16 +177,12 @@ export default function PlayerProfileView({
     }
   }
 
-  function pick(...keys: string[]): string {
-    if (!profile) return "—";
-    for (const k of keys) {
-      const v = profile[k];
-      if (v !== undefined && v !== null && v !== "") return String(v);
-    }
-    return "—";
-  }
-
-  const resolvedGuid = pick("user_guid","userGuid","guid","player_guid","playerGuid","id");
+  // Shorthand accessors for the nested structure
+  const p        = profile;
+  const player   = p?.player;
+  const prof     = player?.profile;
+  const role     = prof?.role;
+  const userGuid = p?.guid ?? "—";
 
   return (
     <div className="flex flex-col gap-6">
@@ -201,72 +205,73 @@ export default function PlayerProfileView({
       {error && <div className="bg-[var(--panel)] border rounded-lg p-4 text-[var(--danger)] text-sm">{error}</div>}
 
       {profile && (
-        <>
-          {/* Profile fields */}
-          <div className="bg-[var(--panel)] border rounded-lg p-4">
-            <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Player Profile</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Field label="Codename"      value={pick("codename","Codename","player_codename","name","nickname")} />
-              <Field label="Username"      value={pick("username","userName","user_name","email")} />
-              <Field label="Player GUID"   value={resolvedGuid} mono />
-              <Field label="Rank"          value={pick("rank","rank_num","rankNum","rank_name","rankName")} />
-              <Field label="EXP"           value={pick("experience","exp","rank_exp","rankExp","total_exp")} />
-              <Field label="Kills"         value={pick("kills","total_kills","totalKills")} />
-              <Field label="Deaths"        value={pick("deaths","total_deaths","totalDeaths")} />
-              <Field label="K/D Ratio"     value={pick("kill_death_ratio","killDeathRatio","kd","kdr")} />
-              <Field label="Matches"       value={pick("matches_played","matchesPlayed","matches","total_matches")} />
-              <Field label="Win Ratio"     value={pick("win_ratio","winRatio","wins")} />
-              <Field label="Status"        value={pick("status","account_status","accountStatus","ban_status","banStatus")} />
-              <Field label="Date Joined"   value={pick("date_joined","dateJoined","created_at","createdAt","date_added","dateAdded")} />
-            </div>
+        <div className="flex flex-col gap-4">
 
-            {/* Raw fields for any extra data */}
-            {Object.keys(profile).length > 12 && (
-              <details className="mt-4">
-                <summary className="text-xs text-[var(--text-dim)] cursor-pointer hover:text-white">Show all fields</summary>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
-                  {Object.entries(profile).map(([k, v]) => (
-                    <div key={k} className="flex flex-col bg-[var(--panel-2)] rounded px-3 py-1.5">
-                      <span className="text-[10px] text-[var(--text-dim)] uppercase tracking-wide">{k}</span>
-                      <span className="text-xs font-mono break-all text-white/80">
-                        {v === null ? "null" : typeof v === "object" ? JSON.stringify(v) : String(v)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            )}
+          {/* ── Account ── */}
+          <div className="bg-[var(--panel)] border rounded-lg p-4">
+            <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Account</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <Field label="Username"   value={p?.username} />
+              <Field label="Email"      value={p?.email} />
+              <Field label="User GUID"  value={userGuid} mono />
+              <Badge label="Verified"   value={p?.verified} />
+              <Badge label="Allow Gifting"       value={player?.allowed_gift} />
+              <Badge label="Marketplace Access"  value={p?.market_place_open} />
+            </div>
           </div>
 
-          {/* Actions */}
+          {/* ── Player ── */}
+          <div className="bg-[var(--panel)] border rounded-lg p-4">
+            <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Player</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <Field label="Codename"    value={player?.codename} />
+              <Field label="Player GUID" value={player?.guid} mono />
+              <Field label="Role"        value={role?.name} />
+              <Field label="EXP"         value={player?.exp} />
+              <Field label="SP"          value={player?.sp} />
+              <Field label="Cash"        value={player?.cash} />
+            </div>
+          </div>
+
+          {/* ── Stats ── */}
+          <div className="bg-[var(--panel)] border rounded-lg p-4">
+            <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Stats</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <Field label="Kills"          value={prof?.kills} />
+              <Field label="Deaths"         value={prof?.deaths} />
+              <Field label="Wins"           value={prof?.wins} />
+              <Field label="Losses"         value={prof?.loses} />
+              <Field label="Headshot Rate"  value={prof?.headshot_rate != null ? `${prof.headshot_rate}%` : null} />
+            </div>
+          </div>
+
+          {/* ── Actions ── */}
           <div className="bg-[var(--panel)] border rounded-lg p-4">
             <div className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">Live Session Actions</div>
             <div className="flex flex-wrap gap-3">
-
               <ActionButton
                 label="⚡ Ban Player"
                 description="Kicks the player from a live server and writes an active-session ban."
                 colorClass="bg-red-600 hover:bg-red-700"
-                onConfirm={(reason) => postAction("banplayer", resolvedGuid, reason)}
+                onConfirm={(reason) => postAction("banplayer", userGuid, reason)}
               />
-
               <ActionButton
                 label="⏏ Disconnect"
                 description="Disconnects the player from a live server. No ban is written."
                 colorClass="bg-orange-600 hover:bg-orange-700"
-                onConfirm={(reason) => postAction("dcplayer", resolvedGuid, reason)}
+                onConfirm={(reason) => postAction("dcplayer", userGuid, reason)}
               />
-
               <button
-                onClick={() => resolvedGuid !== "—" && onHwid(resolvedGuid)}
-                disabled={resolvedGuid === "—"}
+                onClick={() => userGuid !== "—" && onHwid(userGuid)}
+                disabled={userGuid === "—"}
                 className="px-4 py-2 rounded-md border border-blue-500/40 text-blue-400 text-sm hover:bg-blue-500/10 disabled:opacity-40 transition-colors"
               >
                 View HWID Info →
               </button>
             </div>
           </div>
-        </>
+
+        </div>
       )}
     </div>
   );
