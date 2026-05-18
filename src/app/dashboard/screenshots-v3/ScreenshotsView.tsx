@@ -225,7 +225,7 @@ export default function ScreenshotsView({ table = "", showNotes = false }: { tab
     } finally {
       setLoading(false);
     }
-  }, [page, guid, from, to]);
+  }, [page, guid, from, to, table, showNotes]);
 
   useEffect(() => { load(); }, [load]);
 
