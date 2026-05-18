@@ -288,11 +288,12 @@ export default function PlayerProfileView({
     }
   }
 
-  const p      = profile;
-  const player = p?.player;
-  const prof   = player?.profile;
-  const role   = prof?.role;
-  const userGuid = p?.guid ?? "—";
+  const p          = profile;
+  const player     = p?.player;
+  const prof       = player?.profile;
+  const role       = prof?.role;
+  const userGuid   = p?.guid ?? "—";
+  const playerGuid = player?.guid ?? "—";
 
   const activeSubTab = SUB_TABS.find((t) => t.id === subTab);
 
@@ -407,7 +408,7 @@ export default function PlayerProfileView({
 
           {/* Data tabs — lazy loaded */}
           {subTab !== "profile" && activeSubTab?.path && token && (
-            <DataTab key={`${player?.guid}-${activeSubTab.path}`} guid={player?.guid ?? userGuid} path={activeSubTab.path} token={token} />
+            <DataTab key={`${playerGuid}-${activeSubTab.path}`} guid={playerGuid} path={activeSubTab.path} token={token} />
           )}
         </>
       )}
