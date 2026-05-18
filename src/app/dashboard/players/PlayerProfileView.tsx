@@ -178,7 +178,7 @@ export default function PlayerProfileView({
     return "—";
   }
 
-  const resolvedGuid = pick("user_guid","userGuid","guid","player_guid","playerGuid","id");
+  const resolvedGuid = pick("guid","user_guid","userGuid","player_guid","playerGuid","id");
 
   return (
     <div className="flex flex-col gap-6">
