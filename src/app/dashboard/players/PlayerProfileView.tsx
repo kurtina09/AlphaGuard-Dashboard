@@ -407,7 +407,7 @@ export default function PlayerProfileView({
 
           {/* Data tabs — lazy loaded */}
           {subTab !== "profile" && activeSubTab?.path && token && (
-            <DataTab key={`${userGuid}-${activeSubTab.path}`} guid={userGuid} path={activeSubTab.path} token={token} />
+            <DataTab key={`${player?.guid}-${activeSubTab.path}`} guid={player?.guid ?? userGuid} path={activeSubTab.path} token={token} />
           )}
         </>
       )}
