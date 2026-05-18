@@ -70,7 +70,7 @@ export default function PlayersSearchView({
     setLoading(true);
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
-    if (search) qs.set("search", search);
+    if (search) qs.set("search_name_query", search);
     try {
       const res  = await fetch(`${WORKER_API}/admin/players?${qs}`, {
         headers: { Authorization: `Bearer ${token}` },
