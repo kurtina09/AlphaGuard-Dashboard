@@ -116,13 +116,132 @@ function ActionButton({ label, description, colorClass, onConfirm }: {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type MatchItem = Record<string, any>;
 
+type DetailTab = "scoreboard" | "weapons" | "rounds" | "killfeed";
+const DETAIL_TABS: { id: DetailTab; label: string }[] = [
+  { id: "scoreboard", label: "Scoreboard" },
+  { id: "weapons",    label: "Weapons" },
+  { id: "rounds",     label: "Rounds" },
+  { id: "killfeed",   label: "Kill Feed" },
+];
+
+function MatchDetailPanel({ playerGuid, matchGuid, token }: { playerGuid: string; matchGuid: string; token: string }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [detail,  setDetail]  = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState<string | null>(null);
+  const [tab,     setTab]     = useState<DetailTab>("scoreboard");
+
+  const load = useCallback(async () => {
+    if (!playerGuid || !matchGuid || !token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res  = await fetch(`${WORKER_API}/admin/player/${encodeURIComponent(playerGuid)}/match-stats/${encodeURIComponent(matchGuid)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const text = await res.text();
+      let body: unknown;
+      try { body = JSON.parse(text); } catch { throw new Error(`Non-JSON (${res.status}): ${text.slice(0, 200)}`); }
+      const b = body as { error?: string; message?: string };
+      if (!res.ok) throw new Error(b.error ?? b.message ?? `Error ${res.status}`);
+      setDetail(body);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load.");
+    } finally {
+      setLoading(false);
+    }
+  }, [playerGuid, matchGuid, token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function renderRows(rows: any[]) {
+    if (!rows.length) return <div className="px-4 py-6 text-center text-xs text-[var(--text-dim)]">No data.</div>;
+    const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-[var(--panel-2)]/60 text-[var(--text-dim)]">
+            <tr>{keys.map((k) => <th key={k} className="px-3 py-2 text-left whitespace-nowrap">{k}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-t border-[var(--border)]/30 hover:bg-[var(--panel-2)]/40">
+                {keys.map((k) => {
+                  const v = row[k];
+                  const str = v === null || v === undefined ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v);
+                  return (
+                    <td key={k} className="px-3 py-2 font-mono text-white/70 whitespace-nowrap max-w-[200px] truncate" title={str}>
+                      {str}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function getSection(d: any, tabId: DetailTab): any[] {
+    if (!d) return [];
+    const maps: Record<DetailTab, string[]> = {
+      scoreboard: ["scoreboard","players","player_scores","teams","team_scores"],
+      weapons:    ["weapons","weapon_stats","weapon_breakdown","weapon_kills"],
+      rounds:     ["rounds","round_stats","round_results","per_round"],
+      killfeed:   ["kill_feed","kills","kill_log","killfeed","feed"],
+    };
+    for (const key of maps[tabId]) {
+      if (Array.isArray(d[key])) return d[key];
+    }
+    // fallback: show raw object as one row
+    return typeof d === "object" ? [d] : [];
+  }
+
+  return (
+    <div className="border-t border-[var(--border)] bg-[var(--panel-2)]/30">
+      {/* Detail tab bar */}
+      <div className="flex border-b border-[var(--border)]/60 px-4 pt-2 gap-0">
+        {DETAIL_TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+              tab === t.id
+                ? "border-[var(--accent)] text-white"
+                : "border-transparent text-[var(--text-dim)] hover:text-white"
+            }`}>
+            {t.label}
+          </button>
+        ))}
+        <div className="ml-auto pb-1">
+          <button onClick={load} className="text-xs text-[var(--text-dim)] hover:text-white transition-colors">↻</button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="min-h-[80px]">
+        {loading && <div className="p-6 text-center text-xs text-[var(--text-dim)]">Loading…</div>}
+        {!loading && error && (
+          <div className="p-4 text-xs text-[var(--danger)] flex items-center gap-2">
+            <span>{error}</span>
+            <button onClick={load} className="underline text-[var(--text-dim)] hover:text-white">Retry</button>
+          </div>
+        )}
+        {!loading && !error && detail && renderRows(getSection(detail, tab))}
+      </div>
+    </div>
+  );
+}
+
 function MatchStatsTab({ guid, token }: { guid: string; token: string }) {
-  const [items,    setItems]    = useState<MatchItem[]>([]);
-  const [page,     setPage]     = useState(0);
-  const [total,    setTotal]    = useState(0);
-  const [totalPgs, setTotalPgs] = useState(1);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  const [items,       setItems]       = useState<MatchItem[]>([]);
+  const [page,        setPage]        = useState(0);
+  const [total,       setTotal]       = useState(0);
+  const [totalPgs,    setTotalPgs]    = useState(1);
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   const PAGE_SIZE = 20;
 
@@ -145,6 +264,7 @@ function MatchStatsTab({ guid, token }: { guid: string; token: string }) {
       setItems(d?.items ?? []);
       setTotal(d?.totalCount ?? d?.total_count ?? 0);
       setTotalPgs(d?.total_pages ?? 1);
+      setExpandedIdx(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
@@ -176,6 +296,7 @@ function MatchStatsTab({ guid, token }: { guid: string; token: string }) {
         <table className="w-full text-sm">
           <thead className="bg-[var(--panel-2)]/60 text-xs text-[var(--text-dim)]">
             <tr>
+              <th className="px-3 py-2.5 w-8"></th>
               <th className="px-4 py-2.5 text-left whitespace-nowrap">Date</th>
               <th className="px-4 py-2.5 text-left">Mode</th>
               <th className="px-4 py-2.5 text-left">Result</th>
@@ -191,39 +312,59 @@ function MatchStatsTab({ guid, token }: { guid: string; token: string }) {
           </thead>
           <tbody>
             {items.map((item, idx) => {
-              const won      = item.won;
-              const isDraw   = item.is_a_draw;
+              const won       = item.won;
+              const isDraw    = item.is_a_draw;
               const suspicion = item.suspicion_score ?? 0;
+              const isOpen    = expandedIdx === idx;
 
               let resultLabel = "Loss";
               let resultCls   = "bg-red-500/20 text-red-400";
-              if (isDraw)    { resultLabel = "Draw"; resultCls = "bg-zinc-600/40 text-zinc-300"; }
-              else if (won)  { resultLabel = "Win";  resultCls = "bg-emerald-500/20 text-emerald-400"; }
+              if (isDraw)   { resultLabel = "Draw"; resultCls = "bg-zinc-600/40 text-zinc-300"; }
+              else if (won) { resultLabel = "Win";  resultCls = "bg-emerald-500/20 text-emerald-400"; }
 
               return (
-                <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
-                  <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
-                    {fmtDate(item.end_game_time ?? item.date_added)}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs text-white">{item.mode_str ?? "—"}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${resultCls}`}>
-                      {resultLabel}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-xs text-right text-white font-medium">{item.total_kills ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.total_deaths ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.headshots ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.total_damage_dealt?.toLocaleString() ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-right text-amber-400">{item.sp ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-right text-blue-400">{item.experience?.toLocaleString() ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.minutes_played ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-right">
-                    <span className={suspicion > 0 ? "text-red-400 font-semibold" : "text-[var(--text-dim)]"}>
-                      {suspicion}
-                    </span>
-                  </td>
-                </tr>
+                <>
+                  <tr key={`row-${idx}`}
+                    className={`border-t border-[var(--border)]/40 transition-colors ${isOpen ? "bg-[var(--panel-2)]" : "hover:bg-[var(--panel-2)]/50"}`}>
+                    {/* Eye button */}
+                    <td className="px-3 py-2.5 text-center">
+                      <button
+                        onClick={() => setExpandedIdx(isOpen ? null : idx)}
+                        title="View match details"
+                        className={`p-1 rounded transition-colors ${isOpen ? "text-[var(--accent)]" : "text-[var(--text-dim)] hover:text-white"}`}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M10 3C5 3 1.73 7.11 1.05 9.63a1 1 0 000 .74C1.73 12.89 5 17 10 17s8.27-4.11 8.95-6.63a1 1 0 000-.74C18.27 7.11 15 3 10 3zm0 11a4 4 0 110-8 4 4 0 010 8zm0-6a2 2 0 100 4 2 2 0 000-4z"/>
+                        </svg>
+                      </button>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
+                      {fmtDate(item.end_game_time ?? item.date_added)}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-white">{item.mode_str ?? "—"}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${resultCls}`}>{resultLabel}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-right text-white font-medium">{item.total_kills ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.total_deaths ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.headshots ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.total_damage_dealt?.toLocaleString() ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-amber-400">{item.sp ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-blue-400">{item.experience?.toLocaleString() ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.minutes_played ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-right">
+                      <span className={suspicion > 0 ? "text-red-400 font-semibold" : "text-[var(--text-dim)]"}>{suspicion}</span>
+                    </td>
+                  </tr>
+
+                  {isOpen && (
+                    <tr key={`detail-${idx}`}>
+                      <td colSpan={12} className="p-0">
+                        <MatchDetailPanel playerGuid={guid} matchGuid={item.guid} token={token} />
+                      </td>
+                    </tr>
+                  )}
+                </>
               );
             })}
           </tbody>
