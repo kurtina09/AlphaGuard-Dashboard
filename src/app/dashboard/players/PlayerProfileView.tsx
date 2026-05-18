@@ -130,7 +130,7 @@ export default function PlayerProfileView({
     setError(null);
     setProfile(null);
     try {
-      const res  = await fetch(`${WORKER_API}/admin/players/${encodeURIComponent(guid.trim())}`, {
+      const res  = await fetch(`${WORKER_API}/admin/player/${encodeURIComponent(guid.trim())}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const text = await res.text();
