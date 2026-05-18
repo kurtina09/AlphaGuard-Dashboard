@@ -124,7 +124,7 @@ function DataTab({ guid, path, token }: { guid: string; path: string; token: str
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch(`${WORKER_API}/player/${encodeURIComponent(guid)}/${path}`, {
+      const res  = await fetch(`${WORKER_API}/admin/player/${encodeURIComponent(guid)}/${path}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const text = await res.text();
