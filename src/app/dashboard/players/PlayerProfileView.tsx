@@ -112,6 +112,140 @@ function ActionButton({ label, description, colorClass, onConfirm }: {
   );
 }
 
+/* ── Match Stats tab ─────────────────────────────────────────────────────── */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MatchItem = Record<string, any>;
+
+function MatchStatsTab({ guid, token }: { guid: string; token: string }) {
+  const [items,    setItems]    = useState<MatchItem[]>([]);
+  const [page,     setPage]     = useState(0);
+  const [total,    setTotal]    = useState(0);
+  const [totalPgs, setTotalPgs] = useState(1);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+
+  const PAGE_SIZE = 20;
+
+  const load = useCallback(async () => {
+    if (!guid || !token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const qs  = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
+      const res = await fetch(`${WORKER_API}/admin/player/${encodeURIComponent(guid)}/match-stats?${qs}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const text = await res.text();
+      let body: unknown;
+      try { body = JSON.parse(text); } catch { throw new Error(`Non-JSON (${res.status}): ${text.slice(0, 200)}`); }
+      const b = body as { error?: string; message?: string };
+      if (!res.ok) throw new Error(b.error ?? b.message ?? `Error ${res.status}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = body as any;
+      setItems(d?.items ?? []);
+      setTotal(d?.totalCount ?? d?.total_count ?? 0);
+      setTotalPgs(d?.total_pages ?? 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load.");
+    } finally {
+      setLoading(false);
+    }
+  }, [guid, token, page]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)]">Loading…</div>;
+  if (error)   return (
+    <div className="bg-[var(--panel)] border rounded-lg p-4 text-[var(--danger)] text-sm flex items-center justify-between">
+      <span>{error}</span>
+      <button onClick={load} className="text-xs text-[var(--text-dim)] hover:text-white underline ml-4">Retry</button>
+    </div>
+  );
+  if (!items.length) return <div className="bg-[var(--panel)] border rounded-lg p-10 text-center text-[var(--text-dim)] text-sm">No match stats found.</div>;
+
+  return (
+    <div className="bg-[var(--panel)] border rounded-lg overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--panel-2)]">
+        <span className="text-xs text-[var(--text-dim)]">{total.toLocaleString()} match{total !== 1 ? "es" : ""}</span>
+        <button onClick={load} className="text-xs text-[var(--text-dim)] hover:text-white transition-colors">↻ Refresh</button>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-[var(--panel-2)]/60 text-xs text-[var(--text-dim)]">
+            <tr>
+              <th className="px-4 py-2.5 text-left whitespace-nowrap">Date</th>
+              <th className="px-4 py-2.5 text-left">Mode</th>
+              <th className="px-4 py-2.5 text-left">Result</th>
+              <th className="px-4 py-2.5 text-right">K</th>
+              <th className="px-4 py-2.5 text-right">D</th>
+              <th className="px-4 py-2.5 text-right">HS</th>
+              <th className="px-4 py-2.5 text-right whitespace-nowrap">Damage</th>
+              <th className="px-4 py-2.5 text-right">SP</th>
+              <th className="px-4 py-2.5 text-right">EXP</th>
+              <th className="px-4 py-2.5 text-right whitespace-nowrap">Mins</th>
+              <th className="px-4 py-2.5 text-right whitespace-nowrap">Suspicion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, idx) => {
+              const won      = item.won;
+              const isDraw   = item.is_a_draw;
+              const suspicion = item.suspicion_score ?? 0;
+
+              let resultLabel = "Loss";
+              let resultCls   = "bg-red-500/20 text-red-400";
+              if (isDraw)    { resultLabel = "Draw"; resultCls = "bg-zinc-600/40 text-zinc-300"; }
+              else if (won)  { resultLabel = "Win";  resultCls = "bg-emerald-500/20 text-emerald-400"; }
+
+              return (
+                <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
+                  <td className="px-4 py-2.5 text-xs text-[var(--text-dim)] whitespace-nowrap">
+                    {fmtDate(item.end_game_time ?? item.date_added)}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-white">{item.mode_str ?? "—"}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${resultCls}`}>
+                      {resultLabel}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-right text-white font-medium">{item.total_kills ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.total_deaths ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.headshots ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.total_damage_dealt?.toLocaleString() ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-right text-amber-400">{item.sp ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-right text-blue-400">{item.experience?.toLocaleString() ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-right text-[var(--text-dim)]">{item.minutes_played ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-right">
+                    <span className={suspicion > 0 ? "text-red-400 font-semibold" : "text-[var(--text-dim)]"}>
+                      {suspicion}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {totalPgs > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] text-xs text-[var(--text-dim)]">
+          <span>Page {page + 1} of {totalPgs}</span>
+          <div className="flex gap-2">
+            <button disabled={page === 0 || loading} onClick={() => setPage((p) => p - 1)}
+              className="px-3 py-1.5 rounded border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed">‹ Prev</button>
+            <button disabled={page >= totalPgs - 1 || loading} onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1.5 rounded border hover:text-white disabled:opacity-40 disabled:cursor-not-allowed">Next ›</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Generic data tab ────────────────────────────────────────────────────── */
 function fmtDate(s: string | number | null | undefined) {
   if (!s || s === 0) return "—";
@@ -455,8 +589,13 @@ export default function PlayerProfileView({
             </div>
           )}
 
-          {/* Data tabs — lazy loaded */}
-          {subTab !== "profile" && activeSubTab?.path && token && (
+          {/* Match stats tab */}
+          {subTab === "match-stats" && token && (
+            <MatchStatsTab key={playerGuid} guid={playerGuid} token={token} />
+          )}
+
+          {/* Generic data tabs — lazy loaded */}
+          {subTab !== "profile" && subTab !== "match-stats" && activeSubTab?.path && token && (
             <DataTab key={`${playerGuid}-${activeSubTab.path}`} guid={playerGuid} path={activeSubTab.path} token={token} />
           )}
         </>
