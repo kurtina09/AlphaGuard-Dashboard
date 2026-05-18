@@ -136,7 +136,7 @@ function MatchDetailPanel({ playerGuid, matchGuid, token }: { playerGuid: string
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch(`${WORKER_API}/admin/player/${encodeURIComponent(playerGuid)}/match-stats/${encodeURIComponent(matchGuid)}`, {
+      const res  = await fetch(`${WORKER_API}/admin/match-stats/${encodeURIComponent(matchGuid)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const text = await res.text();
