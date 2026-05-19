@@ -52,7 +52,10 @@ function GuidCell({ value, codename }: { value: string; codename?: string | null
   return (
     <div className="flex flex-col gap-0.5">
       {codename && (
-        <span className="text-xs font-semibold text-white">{codename}</span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-semibold text-white">{codename}</span>
+          <CopyButton text={codename} />
+        </div>
       )}
       <div className="flex items-center gap-1">
         <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[150px]" title={value}>
