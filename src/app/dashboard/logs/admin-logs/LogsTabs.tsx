@@ -5,13 +5,15 @@ import AdminLogsView from "./AdminLogsView";
 import SystemLogsView from "../system-logs/SystemLogsView";
 import SpBugView from "../sp-bug/SpBugView";
 import GiftLogsView from "../gift-logs/GiftLogsView";
+import ShopLogsView from "../shop-logs/ShopLogsView";
 
-type Tab = "admin" | "system" | "gifts" | "spbug";
+type Tab = "admin" | "system" | "gifts" | "shop" | "spbug";
 
 const TABS: { id: Tab; label: string; amber?: boolean }[] = [
   { id: "admin",  label: "Admin Logs" },
   { id: "system", label: "System Logs" },
   { id: "gifts",  label: "Gifts" },
+  { id: "shop",   label: "Shop Purchases" },
   { id: "spbug",  label: "⚠ SP BUG", amber: true },
 ];
 
@@ -44,6 +46,7 @@ export default function LogsTabs() {
       {tab === "admin"  && <AdminLogsView />}
       {tab === "system" && <SystemLogsView />}
       {tab === "gifts"  && <GiftLogsView />}
+      {tab === "shop"   && <ShopLogsView />}
       {tab === "spbug"  && <SpBugView />}
     </>
   );
