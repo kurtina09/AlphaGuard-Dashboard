@@ -149,7 +149,7 @@ export default function PlayerHwidView({ guid: initialGuid }: { guid: string }) 
     setError(null);
     setHwidData(null);
     try {
-      const res  = await fetch(`${WORKER_API}/admin/player/${encodeURIComponent(guid.trim())}/hwid-info`, {
+      const res  = await fetch(`${WORKER_API}/admin/players/${encodeURIComponent(guid.trim())}/hwid-info`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const text = await res.text();
