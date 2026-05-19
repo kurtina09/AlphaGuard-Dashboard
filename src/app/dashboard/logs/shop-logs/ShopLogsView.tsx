@@ -48,7 +48,7 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function PlayerCell({ guid, codename }: { guid: string; codename?: string | null }) {
-  if (!guid || guid === "—") return <span className="text-xs text-[var(--text-dim)]">—</span>;
+  if (!codename && (!guid || guid === "—")) return <span className="text-xs text-[var(--text-dim)]">—</span>;
   return (
     <div className="flex flex-col gap-0.5">
       {codename && (
@@ -57,13 +57,33 @@ function PlayerCell({ guid, codename }: { guid: string; codename?: string | null
           <CopyButton text={codename} />
         </div>
       )}
-      <div className="flex items-center gap-1">
-        <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[150px]" title={guid}>
-          {guid}
-        </span>
-        <CopyButton text={guid} />
-      </div>
+      {guid && guid !== "—" && (
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[150px]" title={guid}>
+            {guid}
+          </span>
+          <CopyButton text={guid} />
+        </div>
+      )}
     </div>
+  );
+}
+
+/* ── Item type badge ─────────────────────────────────────────────────────── */
+const ITEM_TYPES: Record<string, { label: string; cls: string }> = {
+  "0": { label: "Weapon", cls: "bg-red-900/30 text-red-400 border-red-700/40" },
+  "1": { label: "Armor",  cls: "bg-blue-900/30 text-blue-400 border-blue-700/40" },
+  "2": { label: "Item",   cls: "bg-emerald-900/30 text-emerald-400 border-emerald-700/40" },
+};
+
+function ItemTypeBadge({ type }: { type: string | null | undefined }) {
+  if (type === null || type === undefined) return <span className="text-xs text-[var(--text-dim)]">—</span>;
+  const entry = ITEM_TYPES[String(type)];
+  if (!entry) return <span className="text-xs font-mono text-[var(--text-dim)]">{type}</span>;
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${entry.cls}`}>
+      {entry.label}
+    </span>
   );
 }
 
@@ -136,25 +156,6 @@ function Pagination({
   );
 }
 
-/* ── Codename fetcher ────────────────────────────────────────────────────── */
-async function fetchCodenames(guids: string[]): Promise<Record<string, string | null>> {
-  const unique = [...new Set(guids.filter(Boolean))];
-  if (!unique.length) return {};
-  const results = await Promise.all(
-    unique.map(async (guid) => {
-      try {
-        const res = await fetch(`/api/player/${guid}`);
-        if (!res.ok) return [guid, null] as const;
-        const body = await res.json() as { codename?: string | null };
-        return [guid, body.codename ?? null] as const;
-      } catch {
-        return [guid, null] as const;
-      }
-    }),
-  );
-  return Object.fromEntries(results);
-}
-
 /* ── Constants ───────────────────────────────────────────────────────────── */
 const PAGE_SIZE  = 50;
 const WORKER_API = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
@@ -171,7 +172,6 @@ export default function ShopLogsView() {
   const [error,        setError]        = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [token,        setToken]        = useState<string | null>(null);
-  const [codenames,    setCodenames]    = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     fetch("/api/admin-logs")
@@ -201,14 +201,6 @@ export default function ShopLogsView() {
       if (!res.ok) throw new Error(b.error ?? b.message ?? `Error ${res.status}`);
       const pageData = body as PageResponse;
       setData(pageData);
-
-      // Batch-fetch codenames for all player GUIDs on this page
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pageItems: LogItem[] = (pageData as any)?.items ?? (pageData as any)?.content ?? (pageData as any)?.data ?? [];
-      const guids = pageItems
-        .map((item) => item.player_guid ?? item.playerGuid ?? item.buyer_guid ?? item.buyerGuid ?? item.user_guid ?? item.userGuid ?? "")
-        .filter(Boolean) as string[];
-      if (guids.length) fetchCodenames(guids).then(setCodenames).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
@@ -328,6 +320,7 @@ export default function ShopLogsView() {
                   <th className="px-4 py-2.5 text-left whitespace-nowrap">Date</th>
                   <th className="px-4 py-2.5 text-left">Player</th>
                   <th className="px-4 py-2.5 text-left">Item</th>
+                  <th className="px-4 py-2.5 text-left whitespace-nowrap">Item Type</th>
                   <th className="px-4 py-2.5 text-left">Price</th>
                   <th className="px-4 py-2.5 text-left">Currency</th>
                   <th className="px-4 py-2.5 text-left">Duration</th>
@@ -335,11 +328,13 @@ export default function ShopLogsView() {
               </thead>
               <tbody>
                 {items.map((item, idx) => {
-                  const date      = item.date_added ?? item.created_at ?? item.createdAt ?? item.date ?? item.timestamp ?? null;
+                  const date      = item.date ?? item.date_added ?? item.created_at ?? item.createdAt ?? item.timestamp ?? null;
                   const playerGuid= item.player_guid ?? item.playerGuid ?? item.buyer_guid ?? item.buyerGuid ?? item.user_guid ?? item.userGuid ?? "";
+                  const codename  = item.codename ?? item.Codename ?? null;
                   const itemName  = item.item_name ?? item.itemName ?? item.shop_item_name ?? item.product_name ?? item.productName ?? item.name ?? "—";
-                  const price     = item.price ?? item.cost ?? item.amount ?? item.total ?? null;
-                  const currency  = item.currency ?? item.currency_type ?? item.currencyType ?? item.payment_type ?? item.paymentType ?? null;
+                  const itemType  = item.item_type ?? item.itemType ?? item.type ?? null;
+                  const price     = item.bought_for_amount ?? item.boughtForAmount ?? item.price ?? item.cost ?? item.amount ?? null;
+                  const currency  = item.money_type_name ?? item.moneyTypeName ?? item.currency ?? item.currency_type ?? null;
                   const duration  = item.duration ?? item.duration_days ?? item.durationDays ?? item.days ?? null;
                   const isExpanded = expandedRows.has(idx);
 
@@ -364,12 +359,17 @@ export default function ShopLogsView() {
 
                         {/* Player */}
                         <td className="px-4 py-2.5">
-                          <PlayerCell guid={playerGuid} codename={playerGuid ? codenames[playerGuid] : null} />
+                          <PlayerCell guid={playerGuid} codename={codename} />
                         </td>
 
                         {/* Item */}
                         <td className="px-4 py-2.5">
                           <span className="text-xs text-white/80">{itemName}</span>
+                        </td>
+
+                        {/* Item Type */}
+                        <td className="px-4 py-2.5">
+                          <ItemTypeBadge type={itemType !== null ? String(itemType) : null} />
                         </td>
 
                         {/* Price */}
@@ -392,7 +392,7 @@ export default function ShopLogsView() {
 
                       {isExpanded && (
                         <tr key={`exp-${idx}`} className="border-t-0">
-                          <td colSpan={7} className="p-0">
+                          <td colSpan={8} className="p-0">
                             <ExpandedDetail item={item} />
                           </td>
                         </tr>
