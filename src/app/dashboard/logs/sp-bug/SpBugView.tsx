@@ -19,9 +19,9 @@ type PageResponse = {
 const PAGE_SIZE  = 50;
 const WORKER_API = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
 
-// The specific SP bug fingerprint
-const SP_BUG_MESSAGE   = "UseItem failed";
-const SP_BUG_ITEM_GUID = "72905182-199e-462e-b636-6c4afa852c45";
+// SP bug fingerprint — matches all SP COUPON types
+const SP_BUG_MESSAGE  = "UseItem failed";
+const SP_BUG_KEYWORD  = "SP COUPON";
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function fmtDate(s: string | null | undefined) {
@@ -186,7 +186,7 @@ export default function SpBugView() {
         ...page_data,
         items: (page_data.items ?? []).filter((item) => {
           const msg = String(item.message ?? item.Message ?? item.description ?? item.log_message ?? "");
-          return msg.includes(SP_BUG_ITEM_GUID);
+          return msg.includes(SP_BUG_KEYWORD);
         }),
       };
       setData(filtered);
@@ -236,7 +236,7 @@ export default function SpBugView() {
           <div className="text-sm font-semibold text-amber-300">500 SP Coupon — UseItem Bug</div>
           <div className="text-xs text-amber-400/70 mt-0.5">
             Showing system logs where <span className="font-mono">UseItem failed</span> and item guid is{" "}
-            <span className="font-mono">{SP_BUG_ITEM_GUID}</span> (500 SP COUPON).
+            message contains <span className="font-mono">{SP_BUG_KEYWORD}</span> (all SP Coupon types).
           </div>
         </div>
       </div>
