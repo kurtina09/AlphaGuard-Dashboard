@@ -50,9 +50,9 @@ export default function PlayersSearchView({
   onHwid:    (guid: string) => void;
 }) {
   const [searchInput, setSearchInput] = useState("");
-  const [searchType,  setSearchType]  = useState<"codename" | "username" | "guid">("codename");
+  const [searchType,  setSearchType]  = useState<"codename" | "username" | "guid" | "email">("codename");
   const [search,      setSearch]      = useState("");
-  const [activeType,  setActiveType]  = useState<"codename" | "username" | "guid">("codename");
+  const [activeType,  setActiveType]  = useState<"codename" | "username" | "guid" | "email">("codename");
   const [page,        setPage]        = useState(0);
   const [data,        setData]        = useState<PageResponse | null>(null);
   const [loading,     setLoading]     = useState(false);
@@ -114,7 +114,7 @@ export default function PlayersSearchView({
       <form onSubmit={applySearch} className="flex gap-2 items-center flex-wrap">
         {/* Search type selector */}
         <div className="flex rounded-md border border-[var(--border)] overflow-hidden shrink-0">
-          {(["codename", "username", "guid"] as const).map((type) => (
+          {(["codename", "username", "email", "guid"] as const).map((type) => (
             <button
               key={type}
               type="button"
@@ -138,6 +138,7 @@ export default function PlayersSearchView({
           placeholder={
             searchType === "codename" ? "Search by codename…" :
             searchType === "username" ? "Search by username…" :
+            searchType === "email"    ? "Search by email…" :
             "Enter Player GUID…"
           }
           className={`flex-1 min-w-[200px] px-3 py-2 bg-[var(--panel)] border rounded-md text-sm outline-none focus:border-[var(--accent)] ${
