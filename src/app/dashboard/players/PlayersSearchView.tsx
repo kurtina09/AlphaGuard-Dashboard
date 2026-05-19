@@ -21,7 +21,6 @@ type PageResponse = {
 
 const WORKER_API = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
 const PAGE_SIZE  = 20;
-const UUID_RE    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -51,7 +50,9 @@ export default function PlayersSearchView({
   onHwid:    (guid: string) => void;
 }) {
   const [searchInput, setSearchInput] = useState("");
+  const [searchType,  setSearchType]  = useState<"codename" | "username" | "guid">("codename");
   const [search,      setSearch]      = useState("");
+  const [activeType,  setActiveType]  = useState<"codename" | "username" | "guid">("codename");
   const [page,        setPage]        = useState(0);
   const [data,        setData]        = useState<PageResponse | null>(null);
   const [loading,     setLoading]     = useState(false);
@@ -72,8 +73,9 @@ export default function PlayersSearchView({
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
     if (search) {
-      if (UUID_RE.test(search)) qs.set("guid", search);
-      else                      qs.set("search_name_query", search);
+      if (activeType === "guid")     qs.set("guid",              search);
+      else if (activeType === "username") qs.set("search_name_query", search);
+      else                           qs.set("search_name_query", search);
     }
     try {
       const res  = await fetch(`${WORKER_API}/admin/players?${qs}`, {
@@ -90,7 +92,7 @@ export default function PlayersSearchView({
     } finally {
       setLoading(false);
     }
-  }, [token, page, search]);
+  }, [token, page, search, activeType]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -98,6 +100,7 @@ export default function PlayersSearchView({
     e.preventDefault();
     setPage(0);
     setSearch(searchInput.trim());
+    setActiveType(searchType);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,14 +113,38 @@ export default function PlayersSearchView({
   return (
     <div className="flex flex-col gap-4">
       {/* Search bar */}
-      <form onSubmit={applySearch} className="flex gap-2 items-center">
+      <form onSubmit={applySearch} className="flex gap-2 items-center flex-wrap">
+        {/* Search type selector */}
+        <div className="flex rounded-md border border-[var(--border)] overflow-hidden shrink-0">
+          {(["codename", "username", "guid"] as const).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => { setSearchType(type); inputRef.current?.focus(); }}
+              className={`px-3 py-2 text-xs font-medium transition-colors capitalize ${
+                searchType === type
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-[var(--panel)] text-[var(--text-dim)] hover:text-white hover:bg-[var(--panel-2)]"
+              }`}
+            >
+              {type === "guid" ? "Player GUID" : type.charAt(0).toUpperCase() + type.slice(1)}
+            </button>
+          ))}
+        </div>
+
         <input
           ref={inputRef}
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search by codename or Player GUID…"
-          className="flex-1 px-3 py-2 bg-[var(--panel)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
+          placeholder={
+            searchType === "codename" ? "Search by codename…" :
+            searchType === "username" ? "Search by username…" :
+            "Enter Player GUID…"
+          }
+          className={`flex-1 min-w-[200px] px-3 py-2 bg-[var(--panel)] border rounded-md text-sm outline-none focus:border-[var(--accent)] ${
+            searchType === "guid" ? "font-mono" : ""
+          }`}
         />
         <button type="submit" disabled={loading}
           className="px-4 py-2 rounded-md bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)] disabled:opacity-40">
@@ -135,7 +162,7 @@ export default function PlayersSearchView({
       {data && !loading && (
         <div className="text-xs text-[var(--text-dim)]">
           {totalCount.toLocaleString()} player{totalCount !== 1 ? "s" : ""}
-          {search && <span className="ml-1 text-[var(--accent)]">matching &ldquo;{search}&rdquo;</span>}
+          {search && <span className="ml-1 text-[var(--accent)]">matching {activeType === "guid" ? "Player GUID" : activeType} &ldquo;{search}&rdquo;</span>}
         </div>
       )}
 
