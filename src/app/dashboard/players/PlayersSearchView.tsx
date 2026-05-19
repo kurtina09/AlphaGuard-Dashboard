@@ -204,7 +204,10 @@ export default function PlayersSearchView({
                       {/* Codename + player_guid below */}
                       <td className="px-4 py-2.5">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-white text-sm">{codename}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-semibold text-white text-sm">{codename}</span>
+                            {codename !== "—" && <CopyButton text={codename} />}
+                          </div>
                           {playerGuid !== "—" && (
                             <div className="flex items-center gap-1">
                               <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[180px]" title={playerGuid}>{playerGuid}</span>
