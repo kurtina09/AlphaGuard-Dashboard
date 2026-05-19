@@ -157,32 +157,35 @@ export default function PlayersSearchView({
               </thead>
               <tbody>
                 {items.map((item, idx) => {
-                  const codename = pick(item, "codename","Codename","player_codename","playerCodename","name","nickname");
-                  const guid     = pick(item, "user_guid","userGuid","guid","player_guid","playerGuid","id");
-                  const username = pick(item, "username","userName","user_name","email");
+                  const codename   = pick(item, "codename","Codename","player_codename","playerCodename","name","nickname");
+                  const playerGuid = pick(item, "player_guid","playerGuid");
+                  const userGuid   = pick(item, "user_guid","userGuid","guid","id");
+                  const username   = pick(item, "username","userName","user_name","email");
+                  // Profile/HWID actions use user_guid; display column shows player_guid
+                  const actionGuid = userGuid !== "—" ? userGuid : playerGuid;
 
                   return (
                     <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
                       <td className="px-4 py-2.5 font-semibold text-white">{codename}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-1">
-                          <span className="font-mono text-xs text-[var(--text-dim)] truncate max-w-[180px]" title={guid}>{guid}</span>
-                          {guid !== "—" && <CopyButton text={guid} />}
+                          <span className="font-mono text-xs text-[var(--text-dim)] truncate max-w-[180px]" title={playerGuid}>{playerGuid}</span>
+                          {playerGuid !== "—" && <CopyButton text={playerGuid} />}
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-[var(--text-dim)]">{username}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => guid !== "—" && onProfile(guid)}
-                            disabled={guid === "—"}
+                            onClick={() => actionGuid !== "—" && onProfile(actionGuid)}
+                            disabled={actionGuid === "—"}
                             className="px-2.5 py-1 rounded text-xs border border-[var(--accent)]/40 text-[var(--accent)] hover:bg-[var(--accent)]/10 disabled:opacity-40 transition-colors"
                           >
                             Profile
                           </button>
                           <button
-                            onClick={() => guid !== "—" && onHwid(guid)}
-                            disabled={guid === "—"}
+                            onClick={() => actionGuid !== "—" && onHwid(actionGuid)}
+                            disabled={actionGuid === "—"}
                             className="px-2.5 py-1 rounded text-xs border border-blue-500/40 text-blue-400 hover:bg-blue-500/10 disabled:opacity-40 transition-colors"
                           >
                             HWID
