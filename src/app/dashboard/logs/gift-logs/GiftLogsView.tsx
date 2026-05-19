@@ -347,7 +347,6 @@ export default function GiftLogsView() {
                   <th className="px-4 py-2.5 text-left">Sender</th>
                   <th className="px-4 py-2.5 text-left">Receiver</th>
                   <th className="px-4 py-2.5 text-left">Item</th>
-                  <th className="px-4 py-2.5 text-left">Amount / Qty</th>
                   <th className="px-4 py-2.5 text-left">Duration</th>
                 </tr>
               </thead>
@@ -357,7 +356,6 @@ export default function GiftLogsView() {
                   const sender   = item.sender_guid   ?? item.senderGuid   ?? item.sender_player_guid   ?? item.from_guid   ?? item.from   ?? "";
                   const receiver = item.receiver_guid ?? item.receiverGuid ?? item.receiver_player_guid ?? item.to_guid     ?? item.to     ?? "";
                   const itemName = item.item_name     ?? item.itemName     ?? item.gift_item_name        ?? item.item       ?? item.name   ?? "—";
-                  const amount   = item.amount ?? item.qty ?? item.quantity ?? item.count ?? null;
                   const duration = item.duration ?? item.duration_days ?? item.durationDays ?? item.days ?? null;
                   const isExpanded = expandedRows.has(idx);
 
@@ -395,11 +393,6 @@ export default function GiftLogsView() {
                           <span className="text-xs text-white/80">{itemName}</span>
                         </td>
 
-                        {/* Amount */}
-                        <td className="px-4 py-2.5 text-xs text-[var(--text-dim)]">
-                          {amount !== null ? String(amount) : "—"}
-                        </td>
-
                         {/* Duration */}
                         <td className="px-4 py-2.5 text-xs text-[var(--text-dim)]">
                           {duration !== null
@@ -410,7 +403,7 @@ export default function GiftLogsView() {
 
                       {isExpanded && (
                         <tr key={`exp-${idx}`} className="border-t-0">
-                          <td colSpan={7} className="p-0">
+                          <td colSpan={6} className="p-0">
                             <ExpandedDetail item={item} />
                           </td>
                         </tr>
