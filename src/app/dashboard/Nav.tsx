@@ -53,8 +53,9 @@ const SECTIONS: Section[] = [
     id: "payment",
     title: "Payment Issues",
     links: [
-      { href: "/dashboard/topup",     label: "Top-Up" },
-      { href: "/dashboard/whitelist", label: "Whitelist" },
+      { href: "/dashboard/topup-logs", label: "Top-Up Logs" },
+      { href: "/dashboard/topup",      label: "Top-Up" },
+      { href: "/dashboard/whitelist",  label: "Whitelist" },
     ],
   },
 ];

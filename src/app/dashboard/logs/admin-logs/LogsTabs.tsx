@@ -3,16 +3,14 @@
 import { useState } from "react";
 import AdminLogsView from "./AdminLogsView";
 import SystemLogsView from "../system-logs/SystemLogsView";
-import TransactionLogsView from "../transaction-logs/TransactionLogsView";
 import SpBugView from "../sp-bug/SpBugView";
 
-type Tab = "admin" | "system" | "transactions" | "spbug";
+type Tab = "admin" | "system" | "spbug";
 
 const TABS: { id: Tab; label: string; amber?: boolean }[] = [
-  { id: "admin",        label: "Admin Logs" },
-  { id: "system",       label: "System Logs" },
-  { id: "transactions", label: "Transactions / Shop" },
-  { id: "spbug",        label: "⚠ SP BUG", amber: true },
+  { id: "admin",  label: "Admin Logs" },
+  { id: "system", label: "System Logs" },
+  { id: "spbug",  label: "⚠ SP BUG", amber: true },
 ];
 
 export default function LogsTabs() {
@@ -41,10 +39,9 @@ export default function LogsTabs() {
         ))}
       </div>
 
-      {tab === "admin"        && <AdminLogsView />}
-      {tab === "system"       && <SystemLogsView />}
-      {tab === "transactions" && <TransactionLogsView />}
-      {tab === "spbug"        && <SpBugView />}
+      {tab === "admin"  && <AdminLogsView />}
+      {tab === "system" && <SystemLogsView />}
+      {tab === "spbug"  && <SpBugView />}
     </>
   );
 }
