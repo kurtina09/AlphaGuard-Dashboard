@@ -199,7 +199,12 @@ export default function PlayersSearchView({
                   return (
                     <tr key={idx} className="border-t border-[var(--border)]/40 hover:bg-[var(--panel-2)]/50 transition-colors">
                       {/* Username */}
-                      <td className="px-4 py-2.5 text-xs text-[var(--text-dim)]">{username}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-[var(--text-dim)]">{username}</span>
+                          {username !== "—" && <CopyButton text={username} />}
+                        </div>
+                      </td>
 
                       {/* Codename + player_guid below */}
                       <td className="px-4 py-2.5">
@@ -218,7 +223,12 @@ export default function PlayersSearchView({
                       </td>
 
                       {/* Email */}
-                      <td className="px-4 py-2.5 text-xs text-[var(--text-dim)]">{email}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-[var(--text-dim)]">{email}</span>
+                          {email !== "—" && <CopyButton text={email} />}
+                        </div>
+                      </td>
 
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-center gap-2">
