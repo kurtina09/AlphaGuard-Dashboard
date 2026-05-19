@@ -21,6 +21,7 @@ type PageResponse = {
 
 const WORKER_API = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
 const PAGE_SIZE  = 20;
+const UUID_RE    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -70,7 +71,10 @@ export default function PlayersSearchView({
     setLoading(true);
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
-    if (search) qs.set("search_name_query", search);
+    if (search) {
+      if (UUID_RE.test(search)) qs.set("player_guid", search);
+      else                      qs.set("search_name_query", search);
+    }
     try {
       const res  = await fetch(`${WORKER_API}/admin/players?${qs}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -112,7 +116,7 @@ export default function PlayersSearchView({
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search by codename, GUID, username…"
+          placeholder="Search by codename or Player GUID…"
           className="flex-1 px-3 py-2 bg-[var(--panel)] border rounded-md text-sm outline-none focus:border-[var(--accent)]"
         />
         <button type="submit" disabled={loading}
