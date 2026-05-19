@@ -72,7 +72,7 @@ export default function PlayersSearchView({
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
     if (search) {
-      if (UUID_RE.test(search)) qs.set("player_guid", search);
+      if (UUID_RE.test(search)) qs.set("guid", search);
       else                      qs.set("search_name_query", search);
     }
     try {
