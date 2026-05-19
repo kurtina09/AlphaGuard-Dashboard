@@ -61,6 +61,19 @@ const SECTIONS: Section[] = [
 ];
 
 const STORAGE_KEY = "ag-nav-open";
+const WORKER_API  = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
+const STATS_REFRESH_MS = 30_000; // 30s
+
+type UserStats = {
+  online?: number;
+  onlineCount?: number;
+  online_count?: number;
+  userCount?: number;
+  user_count?: number;
+  totalUsers?: number;
+  bannedCount?: number;
+  banned_count?: number;
+};
 
 export default function Nav({
   codename,
@@ -79,6 +92,7 @@ export default function Nav({
     Object.fromEntries(SECTIONS.map((s) => [s.id, true]))
   );
   const [hydrated, setHydrated] = useState(false);
+  const [stats, setStats] = useState<UserStats | null>(null);
 
   useEffect(() => {
     try {
@@ -87,6 +101,35 @@ export default function Nav({
     } catch {}
     setHydrated(true);
   }, []);
+
+  // Poll /users/stats every 30s
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    async function load() {
+      try {
+        const t = await fetch("/api/admin-logs").then((r) => r.json() as Promise<{ token?: string }>);
+        if (!t?.token || cancelled) return;
+        const res = await fetch(`${WORKER_API}/users/stats`, {
+          headers: { Authorization: `Bearer ${t.token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const body = (await res.json()) as UserStats;
+        if (!cancelled) setStats(body);
+      } catch {
+        /* silent */
+      } finally {
+        if (!cancelled) timer = setTimeout(load, STATS_REFRESH_MS);
+      }
+    }
+    load();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, []);
+
+  const online    = stats?.online        ?? stats?.onlineCount   ?? stats?.online_count   ?? null;
+  const userCount = stats?.userCount     ?? stats?.user_count    ?? stats?.totalUsers     ?? null;
+  const banned    = stats?.bannedCount   ?? stats?.banned_count  ?? null;
 
   function toggle(id: string) {
     setOpen((prev) => {
@@ -127,6 +170,33 @@ export default function Nav({
             </svg>
           </button>
         )}
+      </div>
+
+      {/* Stats panel */}
+      <div className="px-3 py-3 border-b border-[var(--border)] bg-[var(--panel-2)]/30">
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className="flex flex-col items-center bg-[var(--panel)] rounded-md py-1.5 px-1 border border-emerald-700/30">
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-sm font-semibold text-emerald-300 tabular-nums">
+                {online !== null ? online.toLocaleString() : "—"}
+              </span>
+            </div>
+            <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-wider mt-0.5">Online</span>
+          </div>
+          <div className="flex flex-col items-center bg-[var(--panel)] rounded-md py-1.5 px-1 border border-[var(--border)]">
+            <span className="text-sm font-semibold text-white tabular-nums">
+              {userCount !== null ? userCount.toLocaleString() : "—"}
+            </span>
+            <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-wider mt-0.5">Users</span>
+          </div>
+          <div className="flex flex-col items-center bg-[var(--panel)] rounded-md py-1.5 px-1 border border-red-700/30">
+            <span className="text-sm font-semibold text-red-400 tabular-nums">
+              {banned !== null ? banned.toLocaleString() : "—"}
+            </span>
+            <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-wider mt-0.5">Banned</span>
+          </div>
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3">
