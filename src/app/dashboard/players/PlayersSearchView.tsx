@@ -73,9 +73,7 @@ export default function PlayersSearchView({
     setError(null);
     const qs = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) });
     if (search) {
-      if (activeType === "guid")     qs.set("guid",              search);
-      else if (activeType === "username") qs.set("search_name_query", search);
-      else                           qs.set("search_name_query", search);
+      qs.set("search_name_query", search);
     }
     try {
       const res  = await fetch(`${WORKER_API}/admin/players?${qs}`, {
