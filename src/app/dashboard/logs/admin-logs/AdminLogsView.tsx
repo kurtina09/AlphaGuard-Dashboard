@@ -51,6 +51,37 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/* ── Highlighted message ─────────────────────────────────────────────────── */
+// Highlights "to user <value>" patterns in log messages
+function HighlightedMessage({ text }: { text: string }) {
+  if (!text || text === "—") return <span className="text-xs text-[var(--text-dim)]">—</span>;
+
+  // Match "to user <anything until next space or end>"
+  const parts = text.split(/(to\s+user\s+\S+)/i);
+
+  return (
+    <span className="text-xs text-[var(--text-dim)] break-words">
+      {parts.map((part, i) => {
+        if (/^to\s+user\s+\S+$/i.test(part)) {
+          // Split into "to user " prefix and the actual identifier
+          const match = part.match(/^(to\s+user\s+)(\S+)$/i);
+          if (match) {
+            return (
+              <span key={i}>
+                <span className="text-white/60">{match[1]}</span>
+                <span className="font-semibold font-mono text-amber-300 bg-amber-500/15 px-1 py-0.5 rounded">
+                  {match[2]}
+                </span>
+              </span>
+            );
+          }
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </span>
+  );
+}
+
 /* ── Action badge ────────────────────────────────────────────────────────── */
 const ACTION_COLORS: Record<string, string> = {
   ban:    "bg-red-900/30 text-red-400 border-red-700/40",
@@ -364,7 +395,6 @@ export default function AdminLogsView() {
                   <th className="px-4 py-2.5 text-left">Action</th>
                   <th className="px-4 py-2.5 text-left whitespace-nowrap">Object Type</th>
                   <th className="px-4 py-2.5 text-left">Staff</th>
-                  <th className="px-4 py-2.5 text-left whitespace-nowrap">Target Account</th>
                   <th className="px-4 py-2.5 text-left">Message</th>
                 </tr>
               </thead>
@@ -373,7 +403,6 @@ export default function AdminLogsView() {
                   const date       = pick(item, "date_added", "date", "created_at", "createdAt", "timestamp", "Date");
                   const actionVal  = pick(item, "action", "Action", "action_type", "actionType");
                   const objType    = pick(item, "object_type", "objectType", "ObjectType");
-                  const objGuid    = pick(item, "object_guid", "objectGuid", "ObjectGuid", "target_guid", "targetGuid", "player_guid", "playerGuid", "recipient_guid", "destination_guid");
                   const codename   = pick(item, "admin_codename", "adminCodename");
                   const username   = pick(item, "admin_username", "adminUsername");
                   const userVal    = codename !== "—" ? codename : username !== "—" ? username : pick(item, "user", "user_guid", "userGuid", "User", "staff", "admin");
@@ -429,24 +458,10 @@ export default function AdminLogsView() {
                           )}
                         </td>
 
-                        {/* Target Account */}
-                        <td className="px-4 py-2.5">
-                          {objGuid !== "—" ? (
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[150px]" title={objGuid}>
-                                {objGuid}
-                              </span>
-                              <CopyButton text={objGuid} />
-                            </div>
-                          ) : (
-                            <span className="text-xs text-[var(--text-dim)]">—</span>
-                          )}
-                        </td>
-
                         {/* Message */}
                         <td className="px-4 py-2.5 max-w-sm">
-                          <div className="text-xs text-[var(--text-dim)] truncate" title={message !== "—" ? message : undefined}>
-                            {message}
+                          <div className="truncate" title={message !== "—" ? message : undefined}>
+                            <HighlightedMessage text={message} />
                           </div>
                         </td>
                       </tr>
@@ -454,7 +469,7 @@ export default function AdminLogsView() {
                       {/* Expanded detail */}
                       {isExpanded && (
                         <tr key={`exp-${idx}`} className="border-t-0">
-                          <td colSpan={7} className="p-0">
+                          <td colSpan={6} className="p-0">
                             <ExpandedDetail item={item} />
                           </td>
                         </tr>
