@@ -348,7 +348,7 @@ export default function GiftLogsView() {
                   <th className="px-4 py-2.5 text-left">Receiver</th>
                   <th className="px-4 py-2.5 text-left">Item</th>
                   <th className="px-4 py-2.5 text-left">Amount / Qty</th>
-                  <th className="px-4 py-2.5 text-left">Status</th>
+                  <th className="px-4 py-2.5 text-left">Duration</th>
                 </tr>
               </thead>
               <tbody>
@@ -358,17 +358,8 @@ export default function GiftLogsView() {
                   const receiver = item.receiver_guid ?? item.receiverGuid ?? item.receiver_player_guid ?? item.to_guid     ?? item.to     ?? "";
                   const itemName = item.item_name     ?? item.itemName     ?? item.gift_item_name        ?? item.item       ?? item.name   ?? "—";
                   const amount   = item.amount ?? item.qty ?? item.quantity ?? item.count ?? null;
-                  const status   = item.status ?? item.gift_status ?? item.state ?? null;
+                  const duration = item.duration ?? item.duration_days ?? item.durationDays ?? item.days ?? null;
                   const isExpanded = expandedRows.has(idx);
-
-                  const statusCls = !status ? "" :
-                    String(status).toLowerCase().includes("success") || String(status).toLowerCase().includes("complet")
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : String(status).toLowerCase().includes("fail") || String(status).toLowerCase().includes("error") || String(status).toLowerCase().includes("reject")
-                        ? "bg-red-500/20 text-red-400"
-                        : String(status).toLowerCase().includes("pend")
-                          ? "bg-amber-500/20 text-amber-400"
-                          : "bg-zinc-700/40 text-zinc-300";
 
                   return (
                     <>
@@ -409,15 +400,11 @@ export default function GiftLogsView() {
                           {amount !== null ? String(amount) : "—"}
                         </td>
 
-                        {/* Status */}
-                        <td className="px-4 py-2.5">
-                          {status !== null ? (
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${statusCls}`}>
-                              {String(status)}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-[var(--text-dim)]">—</span>
-                          )}
+                        {/* Duration */}
+                        <td className="px-4 py-2.5 text-xs text-[var(--text-dim)]">
+                          {duration !== null
+                            ? (Number(duration) === 0 ? "Permanent" : `${duration}d`)
+                            : "—"}
                         </td>
                       </tr>
 
