@@ -65,9 +65,7 @@ const WORKER_API  = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
 const STATS_REFRESH_MS = 30_000; // 30s
 
 type UserStats = {
-  online?: number;
-  onlineCount?: number;
-  online_count?: number;
+  onlinePlayers?: number;
   userCount?: number;
   user_count?: number;
   totalUsers?: number;
@@ -127,7 +125,7 @@ export default function Nav({
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, []);
 
-  const online    = stats?.online        ?? stats?.onlineCount   ?? stats?.online_count   ?? null;
+  const online    = stats?.onlinePlayers ?? null;
   const userCount = stats?.userCount     ?? stats?.user_count    ?? stats?.totalUsers     ?? null;
   const banned    = stats?.bannedCount   ?? stats?.banned_count  ?? null;
 
