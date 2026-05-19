@@ -91,6 +91,7 @@ export default function Nav({
   );
   const [hydrated, setHydrated] = useState(false);
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [bannedHwidCount, setBannedHwidCount] = useState<number | null>(null);
 
   useEffect(() => {
     try {
@@ -108,13 +109,15 @@ export default function Nav({
     async function load() {
       try {
         const t = await fetch("/api/admin-logs").then((r) => r.json() as Promise<{ token?: string }>);
-        if (!t?.token || cancelled) return;
-        const res = await fetch(`${WORKER_API}/users/stats`, {
-          headers: { Authorization: `Bearer ${t.token}` },
-        });
-        if (!res.ok || cancelled) return;
-        const body = (await res.json()) as UserStats;
-        if (!cancelled) setStats(body);
+        const [statsRes, banRes] = await Promise.allSettled([
+          t?.token
+            ? fetch(`${WORKER_API}/users/stats`, { headers: { Authorization: `Bearer ${t.token}` } }).then((r) => r.ok ? r.json() as Promise<UserStats> : null)
+            : Promise.resolve(null),
+          fetch("/api/banned-hwid/count").then((r) => r.ok ? r.json() as Promise<{ count: number }> : null),
+        ]);
+        if (cancelled) return;
+        if (statsRes.status === "fulfilled" && statsRes.value) setStats(statsRes.value);
+        if (banRes.status === "fulfilled" && banRes.value)    setBannedHwidCount(banRes.value.count);
       } catch {
         /* silent */
       } finally {
@@ -172,7 +175,7 @@ export default function Nav({
 
       {/* Stats panel */}
       <div className="px-3 py-3 border-b border-[var(--border)] bg-[var(--panel-2)]/30">
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           <div className="flex flex-col items-center bg-[var(--panel)] rounded-md py-1.5 px-1 border border-emerald-700/30">
             <div className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -193,6 +196,12 @@ export default function Nav({
               {banned !== null ? banned.toLocaleString() : "—"}
             </span>
             <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-wider mt-0.5">Banned</span>
+          </div>
+          <div className="flex flex-col items-center bg-[var(--panel)] rounded-md py-1.5 px-1 border border-orange-700/30">
+            <span className="text-sm font-semibold text-orange-400 tabular-nums">
+              {bannedHwidCount !== null ? bannedHwidCount.toLocaleString() : "—"}
+            </span>
+            <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-wider mt-0.5">Banned HWID</span>
           </div>
         </div>
       </div>
