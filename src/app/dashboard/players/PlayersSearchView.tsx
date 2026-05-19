@@ -162,7 +162,7 @@ export default function PlayersSearchView({
               <tbody>
                 {items.map((item, idx) => {
                   const codename   = pick(item, "codename","Codename","player_codename","playerCodename","name","nickname");
-                  const playerGuid = pick(item, "player_guid","playerGuid");
+                  const playerGuid = pick(item, "guid","player_guid","playerGuid");
                   const userGuid   = pick(item, "user_guid","userGuid","guid","id");
                   const username   = pick(item, "username","userName","user_name");
                   const email      = pick(item, "email","Email","user_email","userEmail");
