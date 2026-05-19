@@ -47,14 +47,19 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function GuidCell({ value }: { value: string }) {
+function GuidCell({ value, codename }: { value: string; codename?: string | null }) {
   if (!value || value === "—") return <span className="text-xs text-[var(--text-dim)]">—</span>;
   return (
-    <div className="flex items-center gap-1">
-      <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[150px]" title={value}>
-        {value}
-      </span>
-      <CopyButton text={value} />
+    <div className="flex flex-col gap-0.5">
+      {codename && (
+        <span className="text-xs font-semibold text-white">{codename}</span>
+      )}
+      <div className="flex items-center gap-1">
+        <span className="font-mono text-[10px] text-[var(--text-dim)] truncate max-w-[150px]" title={value}>
+          {value}
+        </span>
+        <CopyButton text={value} />
+      </div>
     </div>
   );
 }
@@ -128,6 +133,25 @@ function Pagination({
   );
 }
 
+/* ── Codename fetcher ────────────────────────────────────────────────────── */
+async function fetchCodenames(guids: string[]): Promise<Record<string, string | null>> {
+  const unique = [...new Set(guids.filter(Boolean))];
+  if (!unique.length) return {};
+  const results = await Promise.all(
+    unique.map(async (guid) => {
+      try {
+        const res = await fetch(`/api/player/${guid}`);
+        if (!res.ok) return [guid, null] as const;
+        const body = await res.json() as { codename?: string | null };
+        return [guid, body.codename ?? null] as const;
+      } catch {
+        return [guid, null] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(results);
+}
+
 /* ── Constants ───────────────────────────────────────────────────────────── */
 const PAGE_SIZE  = 50;
 const WORKER_API = "https://crimson-art-23d9.secretlifestylejp.workers.dev/v2";
@@ -146,6 +170,7 @@ export default function GiftLogsView() {
   const [error,        setError]        = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [token,        setToken]        = useState<string | null>(null);
+  const [codenames,    setCodenames]    = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     fetch("/api/admin-logs")
@@ -174,7 +199,17 @@ export default function GiftLogsView() {
       catch { throw new Error(`Non-JSON (${res.status}): ${text.slice(0, 300)}`); }
       const b = body as { error?: string; message?: string };
       if (!res.ok) throw new Error(b.error ?? b.message ?? `Error ${res.status}`);
-      setData(body as PageResponse);
+      const pageData = body as PageResponse;
+      setData(pageData);
+
+      // Batch-fetch codenames for all sender + receiver GUIDs on this page
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pageItems: LogItem[] = (pageData as any)?.items ?? (pageData as any)?.content ?? (pageData as any)?.data ?? [];
+      const guids = pageItems.flatMap((item) => [
+        item.sender_guid   ?? item.senderGuid   ?? item.sender_player_guid   ?? item.from_guid ?? "",
+        item.receiver_guid ?? item.receiverGuid ?? item.receiver_player_guid ?? item.to_guid   ?? "",
+      ]).filter(Boolean) as string[];
+      if (guids.length) fetchCodenames(guids).then(setCodenames).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
@@ -353,12 +388,12 @@ export default function GiftLogsView() {
 
                         {/* Sender */}
                         <td className="px-4 py-2.5">
-                          <GuidCell value={sender} />
+                          <GuidCell value={sender} codename={sender ? codenames[sender] : null} />
                         </td>
 
                         {/* Receiver */}
                         <td className="px-4 py-2.5">
-                          <GuidCell value={receiver} />
+                          <GuidCell value={receiver} codename={receiver ? codenames[receiver] : null} />
                         </td>
 
                         {/* Item */}
